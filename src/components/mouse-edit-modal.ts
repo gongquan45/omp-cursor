@@ -194,7 +194,7 @@ export class MouseEditModal implements Component, Focusable {
 			}
 			const maxScroll = Math.max(
 				0,
-				this.#getVisualLines().length - Math.max(1, this.#lastRenderHeight - 2),
+				this.#getVisualLines().length - this.#getTextAreaHeight(),
 			);
 			this.#scrollOffset = Math.max(0, Math.min(maxScroll, this.#scrollOffset + direction));
 			const hit = this.#hitTest(this.#lastMouseRow, this.#lastMouseCol);
@@ -204,7 +204,7 @@ export class MouseEditModal implements Component, Focusable {
 	}
 
 	#getVisualLines(): VisualLine[] {
-		const textAreaWidth = Math.max(1, this.#lastRenderWidth - 2);
+		const textAreaWidth = this.#getTextAreaWidth();
 		const text = this.#buffer.text;
 		if (this.#cachedWidth === textAreaWidth && this.#cachedText === text) {
 			return this.#cachedVisualLines;
@@ -328,6 +328,23 @@ export class MouseEditModal implements Component, Focusable {
 		const boxTextHeight = Math.max(2, Math.min(maxBoxTextHeight, draftLines));
 		return Math.max(0, this.#lastRenderHeight - (boxTextHeight + 2));
 	}
+	#getTextLeftMargin(): number {
+		return this.#layoutMode === "mimic" && this.#lastRenderHeight >= 8 ? 3 : 1;
+	}
+
+	#getTextAreaWidth(): number {
+		const totalMargins =
+			this.#layoutMode === "mimic" && this.#lastRenderHeight >= 8 ? 5 : 2;
+		return Math.max(1, this.#lastRenderWidth - totalMargins);
+	}
+
+	#getTextAreaTopRow(): number {
+		return this.#getBoxStartRow() + 1;
+	}
+
+	#getTextAreaBottomRow(): number {
+		return this.#lastRenderHeight - 2;
+	}
 
 	#getTextAreaHeight(): number {
 		if (this.#layoutMode !== "mimic" || this.#lastRenderHeight < 8) {
@@ -336,7 +353,6 @@ export class MouseEditModal implements Component, Focusable {
 		const boxStartRow = this.#getBoxStartRow();
 		return Math.max(1, this.#lastRenderHeight - boxStartRow - 2);
 	}
-
 	#hitTest(screenRow: number, screenCol: number): number {
 		const vLines = this.#getVisualLines();
 		if (vLines.length === 0) return 0;
@@ -351,7 +367,7 @@ export class MouseEditModal implements Component, Focusable {
 		}
 
 		const vLine = vLines[targetVRow];
-		const textCol = screenCol - 1; // 1-column left margin
+		const textCol = screenCol - this.#getTextLeftMargin();
 
 		if (textCol <= 0) {
 			return vLine.startOffset;
@@ -434,6 +450,16 @@ export class MouseEditModal implements Component, Focusable {
 
 		// Left click
 		if (event.leftClick) {
+			const topRow = this.#getTextAreaTopRow();
+			const bottomRow = this.#getTextAreaBottomRow();
+
+			// In mimic mode, clicking outside the bottom editor area (e.g. top reply card) is ignored
+			if (this.#layoutMode === "mimic" && this.#lastRenderHeight >= 8) {
+				if (event.row < topRow || event.row > bottomRow) {
+					return;
+				}
+			}
+
 			const now = this.#now();
 			const hit = this.#hitTest(event.row, event.col);
 			if (now - this.#lastClickTime <= 500 && hit === this.#lastClickOffset) {
@@ -445,7 +471,6 @@ export class MouseEditModal implements Component, Focusable {
 			this.#lastClickOffset = hit;
 			this.#lastMouseRow = event.row;
 			this.#lastMouseCol = event.col;
-
 			if (this.#clickCount === 1) {
 				this.#buffer.setCaret(hit, false);
 				this.#isDragging = true;
@@ -464,9 +489,9 @@ export class MouseEditModal implements Component, Focusable {
 			}
 
 			this.#stopDragTimer();
-			if (event.row <= 1) {
+			if (event.row <= topRow) {
 				this.#startDragScrollTimer(-1);
-			} else if (event.row >= totalRows - 2) {
+			} else if (event.row >= bottomRow) {
 				this.#startDragScrollTimer(1);
 			}
 			this.#tui.requestRender();
@@ -480,9 +505,11 @@ export class MouseEditModal implements Component, Focusable {
 			const hit = this.#hitTest(event.row, event.col);
 			this.#buffer.setCaret(hit, true);
 
-			if (event.row <= 1) {
+			const topRow = this.#getTextAreaTopRow();
+			const bottomRow = this.#getTextAreaBottomRow();
+			if (event.row <= topRow) {
 				this.#startDragScrollTimer(-1);
-			} else if (event.row >= totalRows - 2) {
+			} else if (event.row >= bottomRow) {
 				this.#startDragScrollTimer(1);
 			} else {
 				this.#stopDragTimer();

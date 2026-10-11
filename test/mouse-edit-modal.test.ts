@@ -482,4 +482,43 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		const scrolledLines = modal.render(80);
 		expect(scrolledLines.length).toBe(24);
 	});
+
+	it("verifies mimic mode hit-testing geometry and ignores clicks in top reply card", () => {
+		const term = new MinimalTerminal();
+		term.columns = 80;
+		term.rows = 24;
+		const tui = new TUI(term);
+
+		const modal = new MouseEditModal(tui, "alpha beta\nsecond line", {
+			contextReply: "Previous reply text",
+			layout: "mimic",
+			onSave: () => true,
+			onCancel: () => {},
+			copy: async () => {},
+			setInterval: () => 0,
+			clearTimer: () => {},
+		});
+
+		modal.render(80);
+		// Caret starts at end of text
+		expect(modal.buffer.cursor).toBe("alpha beta\nsecond line".length);
+
+		// 1. Click in top reply card (row 2 in SGR -> screenRow 1, which is in top area)
+		modal.handleInput("\x1b[<0;10;2M");
+		// Caret must NOT move into text, must remain untouched!
+		expect(modal.buffer.cursor).toBe("alpha beta\nsecond line".length);
+
+		// 2. Click on the first character 'a' in the mimic editor box
+		// In 24 rows, with 2 lines of text, boxStartRow is 20.
+		// Top line of text in box is row 21 (0-based) -> row 22 (1-based SGR report).
+		// In mimic mode, lineContent is " │ " (3 cols prefix).
+		// So text column 0 is screen column 3 (0-based) -> column 4 (1-based SGR report).
+		modal.handleInput("\x1b[<0;4;22M");
+		expect(modal.buffer.cursor).toBe(0); // lands precisely on 'a' (offset 0)!
+
+		// 3. Click on 'beta' (offset 6) in the mimic editor box:
+		// 'alpha ' has width 6, so text column 6 is screen column 3 + 6 = 9 (0-based) -> column 10 (1-based SGR).
+		modal.handleInput("\x1b[<0;10;22M");
+		expect(modal.buffer.cursor).toBe(6); // lands precisely on 'b' in 'beta'!
+	});
 });
