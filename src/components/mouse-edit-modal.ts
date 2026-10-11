@@ -902,7 +902,7 @@ export class MouseEditModal implements Component, Focusable {
 					),
 				);
 			} else {
-				const snapTop = this.#normalSnapshot?.windowTop ?? 0;
+				const snapTop = this.#normalSnapshot?.screenTop ?? 0;
 				for (let r = 0; r < boxStartRow; r++) {
 					const snapIdx = r - snapTop;
 					const snapLine =

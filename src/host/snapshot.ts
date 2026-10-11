@@ -3,6 +3,7 @@ import type { TUI } from "@oh-my-pi/pi-tui";
 export interface ViewportSnapshot {
 	lines: readonly string[];
 	windowTop: number;
+	screenTop: number;
 	altScreen?: boolean;
 }
 
@@ -15,9 +16,14 @@ export function captureHostSnapshot(tui: TUI): ViewportSnapshot | undefined {
 		try {
 			const paint = tui.getDebugPaint();
 			if (paint && Array.isArray(paint.lines) && paint.altScreen !== true) {
+				const viewport =
+					typeof tui.getMutableViewport === "function"
+						? tui.getMutableViewport()
+						: { top: 0, length: 0 };
 				return {
 					lines: paint.lines,
 					windowTop: paint.windowTop ?? 0,
+					screenTop: Math.max(0, viewport.top ?? 0),
 					altScreen: false,
 				};
 			}

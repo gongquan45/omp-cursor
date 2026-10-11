@@ -522,6 +522,40 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		expect(modal.buffer.cursor).toBe(6); // lands precisely on 'b' in 'beta'!
 	});
 
+	it("renders host snapshot using screenTop without being blanked by windowTop", () => {
+		const term = new MinimalTerminal();
+		term.columns = 80;
+		term.rows = 24;
+		const tui = new TUI(term);
+
+		Object.assign(tui, {
+			getDebugPaint: () => ({
+				lines: ["Committed header line", "Visible status line"],
+				windowTop: 200, // large scroll offset in long document
+				altScreen: false,
+			}),
+			getMutableViewport: () => ({
+				top: 1,
+				length: 2,
+			}),
+		});
+
+		const modal = new MouseEditModal(tui, "short draft", {
+			contextReply: null,
+			layout: "mimic",
+			onSave: () => true,
+			onCancel: () => {},
+			copy: async () => {},
+			setInterval: () => 0,
+			clearTimer: () => {},
+		});
+
+		const lines = modal.render(80);
+		expect(lines.length).toBe(24);
+		expect(lines[1]?.includes("Committed header line")).toBe(true);
+		expect(lines[2]?.includes("Visible status line")).toBe(true);
+	});
+
 	it("soft-wraps long single-paragraph context replies and scrolls to the end", () => {
 		const term = new MinimalTerminal();
 		term.columns = 40; // narrow terminal to force wrapping
