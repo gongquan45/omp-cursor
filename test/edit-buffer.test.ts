@@ -179,4 +179,17 @@ describe("EditBuffer - Text Model", () => {
 		const line3Range = getLineRangeAt(text, text.indexOf("last"));
 		expect(text.slice(line3Range.start, line3Range.end)).toBe("last line");
 	});
+	it("supports standalone word navigation and double-click on combining characters", () => {
+		const text = "cafe\u0301 au lait";
+		const buffer = new EditBuffer(text);
+
+		// Cursor at end of "cafe\u0301" (length 5: c,a,f,e,\u0301)
+		buffer.setCaret(5);
+		buffer.moveWordLeft();
+		expect(buffer.cursor).toBe(0);
+
+		// Double-click on combining mark selects entire word "cafe\u0301"
+		const range = getWordRangeAt(text, 4);
+		expect(text.slice(range.start, range.end)).toBe("cafe\u0301");
+	});
 });
