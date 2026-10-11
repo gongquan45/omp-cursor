@@ -1,0 +1,24 @@
+{
+  "name": "omp-mouse-edit-overlay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@oh-my-pi/pi-natives": "18.3.1",
+    "@oh-my-pi/pi-natives-win32-x64": "18.3.1",
+    "@oh-my-pi/pi-tui": "18.3.1"
+  },
+  "devDependencies": {
+    "@oh-my-pi/pi-coding-agent": "18.3.1",
+    "@types/bun": "1.4.2",
+    "typescript": "5.9.3"
+  },
+  "omp": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  }
+}
