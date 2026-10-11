@@ -521,4 +521,40 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		modal.handleInput("\x1b[<0;10;22M");
 		expect(modal.buffer.cursor).toBe(6); // lands precisely on 'b' in 'beta'!
 	});
+
+	it("soft-wraps long single-paragraph context replies and scrolls to the end", () => {
+		const term = new MinimalTerminal();
+		term.columns = 40; // narrow terminal to force wrapping
+		term.rows = 15;
+		const tui = new TUI(term);
+
+		const sentences = Array.from(
+			{ length: 20 },
+			(_, i) => `Sentence number ${i + 1} with enough content to span across columns.`,
+		).join(" ");
+
+		const modal = new MouseEditModal(tui, "short draft", {
+			contextReply: sentences,
+			layout: "mimic",
+			onSave: () => true,
+			onCancel: () => {},
+			copy: async () => {},
+			setInterval: () => 0,
+			clearTimer: () => {},
+		});
+
+		const initialLines = modal.render(40);
+		expect(initialLines.some(l => l.includes("Sentence number 1 "))).toBe(true);
+		// Last sentence should not be visible before scrolling
+		expect(initialLines.some(l => l.includes("Sentence number 20 "))).toBe(false);
+
+		// Wheel down several times on top area (row 2 in SGR)
+		for (let i = 0; i < 15; i++) {
+			modal.handleInput("\x1b[<65;10;2M");
+		}
+
+		const scrolledLines = modal.render(40);
+		// Last sentence should now be scrolled into view!
+		expect(scrolledLines.some(l => l.includes("Sentence number 20 "))).toBe(true);
+	});
 });

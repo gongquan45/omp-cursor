@@ -14,11 +14,11 @@ export function captureHostSnapshot(tui: TUI): ViewportSnapshot | undefined {
 	if (typeof tui.getDebugPaint === "function") {
 		try {
 			const paint = tui.getDebugPaint();
-			if (paint && Array.isArray(paint.lines)) {
+			if (paint && Array.isArray(paint.lines) && paint.altScreen !== true) {
 				return {
 					lines: paint.lines,
 					windowTop: paint.windowTop ?? 0,
-					altScreen: paint.altScreen,
+					altScreen: false,
 				};
 			}
 		} catch {

@@ -8,6 +8,7 @@ import {
 	truncateToWidth,
 	type TUI,
 	visibleWidth,
+	wrapTextWithAnsi,
 } from "@oh-my-pi/pi-tui";
 import { BracketedPasteHandler } from "@oh-my-pi/pi-tui/bracketed-paste";
 import {
@@ -18,7 +19,7 @@ import {
 	sanitizePasteText,
 } from "../core/edit-buffer";
 import { hostTextServices } from "../host/text-services";
-import { captureHostSnapshot } from "../host/snapshot";
+import { captureHostSnapshot, type ViewportSnapshot } from "../host/snapshot";
 
 export type TimerHandle = unknown;
 
@@ -68,6 +69,7 @@ export class MouseEditModal implements Component, Focusable {
 	#lastRenderHeight = 24;
 	readonly #contextReply: string | null;
 	readonly #layoutMode: "mimic" | "fullscreen";
+	readonly #normalSnapshot: ViewportSnapshot | undefined;
 
 	// Mouse interaction state
 	#isDragging = false;
@@ -94,6 +96,7 @@ export class MouseEditModal implements Component, Focusable {
 		this.#contextReply = callbacks.contextReply ?? null;
 		this.#layoutMode =
 			callbacks.layout ?? (callbacks.contextReply !== undefined ? "mimic" : "fullscreen");
+		this.#normalSnapshot = captureHostSnapshot(tui);
 		this.#buffer = new EditBuffer(initialText, {
 			now: this.#now,
 			services: hostTextServices,
@@ -433,9 +436,17 @@ export class MouseEditModal implements Component, Focusable {
 		if (event.wheel !== null) {
 			const boxStartRow = this.#getBoxStartRow();
 			if (this.#layoutMode === "mimic" && event.row < boxStartRow) {
+				const replyInnerWidth = Math.max(1, this.#lastRenderWidth - 6);
+				const replyLineCount = this.#contextReply
+					? wrapTextWithAnsi(this.#contextReply, replyInnerWidth).length
+					: 0;
+				const maxTopScroll = Math.max(
+					0,
+					replyLineCount - Math.max(1, boxStartRow - 2),
+				);
 				this.#topScrollOffset = Math.max(
 					0,
-					this.#topScrollOffset + event.wheel * 2,
+					Math.min(maxTopScroll, this.#topScrollOffset + event.wheel * 2),
 				);
 				this.#tui.requestRender();
 				return;
@@ -874,7 +885,8 @@ export class MouseEditModal implements Component, Focusable {
 						true,
 					),
 				);
-				const replyLines = this.#contextReply.split("\n");
+				const replyInnerWidth = Math.max(1, width - 6);
+				const replyLines = wrapTextWithAnsi(this.#contextReply, replyInnerWidth);
 				const maxReplyRows = Math.max(1, boxStartRow - 2);
 				for (let r = 0; r < maxReplyRows; r++) {
 					const idx = this.#topScrollOffset + r;
@@ -890,9 +902,15 @@ export class MouseEditModal implements Component, Focusable {
 					),
 				);
 			} else {
-				const snapshot = captureHostSnapshot(this.#tui);
+				const snapTop = this.#normalSnapshot?.windowTop ?? 0;
 				for (let r = 0; r < boxStartRow; r++) {
-					const snapLine = snapshot && r < snapshot.lines.length ? snapshot.lines[r] : "";
+					const snapIdx = r - snapTop;
+					const snapLine =
+						this.#normalSnapshot &&
+						snapIdx >= 0 &&
+						snapIdx < this.#normalSnapshot.lines.length
+							? this.#normalSnapshot.lines[snapIdx]
+							: "";
 					lines.push(truncateToWidth(snapLine ?? "", width, "", true));
 				}
 			}
