@@ -76,6 +76,25 @@ describe("EditBuffer - Text Model", () => {
 		expect(buffer.text).toBe("start  middle  end");
 		expect(buffer.cursor).toBe(pasteTokStart);
 	});
+	it("protects 18.9.1 namespaced skill chips as atomic units", () => {
+		const text = "prefix ✦ acme.tools/deploy-service suffix";
+		const buffer = new EditBuffer(text);
+
+		const tokens = getTokenRanges(text);
+		expect(tokens.length).toBe(1);
+		expect(tokens[0].text).toBe("✦ acme.tools/deploy-service");
+
+		const tok = tokens[0];
+		// Caret cannot land in the middle of namespaced skill chip
+		expect(buffer.snapToBoundary(tok.start + 3, "closest")).toBe(tok.start);
+		expect(buffer.snapToBoundary(tok.end - 3, "closest")).toBe(tok.end);
+
+		// Delete backward after namespaced skill deletes entire token
+		buffer.setCaret(tok.end);
+		buffer.deleteBackward();
+		expect(buffer.text).toBe("prefix  suffix");
+		expect(buffer.cursor).toBe(tok.start);
+	});
 
 	it("deletes cross-line selection in one step", () => {
 		const text = "line 1 alpha\nline 2 beta\nline 3 gamma";

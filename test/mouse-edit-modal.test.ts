@@ -449,4 +449,37 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		deliverFirst(" first");
 		expect(modal.buffer.text).toBe("initial direct first second");
 	});
+	it("renders mimic layout with previous reply card and anchors editor to bottom", () => {
+		const term = new MinimalTerminal();
+		term.columns = 80;
+		term.rows = 24;
+		const tui = new TUI(term);
+
+		const previousReply = "Here is the previous agent answer.\nSecond line.\nThird line.";
+		const modal = new MouseEditModal(tui, "draft line 1\ndraft line 2", {
+			contextReply: previousReply,
+			layout: "mimic",
+			onSave: () => true,
+			onCancel: () => {},
+			copy: async () => {},
+			setInterval: () => 0,
+			clearTimer: () => {},
+		});
+
+		const lines = modal.render(80);
+		expect(lines.length).toBe(24);
+
+		// Top reply card is rendered
+		expect(lines.some(l => l.includes("上一次回复"))).toBe(true);
+		expect(lines.some(l => l.includes("Here is the previous agent answer."))).toBe(true);
+
+		// Bottom mimic box is rendered
+		expect(lines.some(l => l.includes("鼠标编辑 (Alt+E)"))).toBe(true);
+		expect(lines.some(l => l.includes("draft line 1"))).toBe(true);
+
+		// Test wheel over top area scrolls top context
+		modal.handleInput("\x1b[<65;10;2M"); // wheel down on row 2 (top area)
+		const scrolledLines = modal.render(80);
+		expect(scrolledLines.length).toBe(24);
+	});
 });

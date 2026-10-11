@@ -18,6 +18,7 @@ import {
 	sanitizePasteText,
 } from "../core/edit-buffer";
 import { hostTextServices } from "../host/text-services";
+import { captureHostSnapshot } from "../host/snapshot";
 
 export type TimerHandle = unknown;
 
@@ -28,6 +29,8 @@ export interface MouseEditModalCallbacks {
 	setInterval: (callback: () => void, ms: number) => TimerHandle;
 	clearTimer: (timer: TimerHandle) => void;
 	now?: () => number;
+	contextReply?: string | null;
+	layout?: "mimic" | "fullscreen";
 }
 
 interface VisualCell {
@@ -60,8 +63,11 @@ export class MouseEditModal implements Component, Focusable {
 	#disposed = false;
 	#errorMessage: string | null = null;
 	#scrollOffset = 0;
+	#topScrollOffset = 0;
 	#lastRenderWidth = 80;
 	#lastRenderHeight = 24;
+	readonly #contextReply: string | null;
+	readonly #layoutMode: "mimic" | "fullscreen";
 
 	// Mouse interaction state
 	#isDragging = false;
@@ -85,6 +91,9 @@ export class MouseEditModal implements Component, Focusable {
 		this.#tui = tui;
 		this.#callbacks = callbacks;
 		this.#now = callbacks.now ?? (() => Date.now());
+		this.#contextReply = callbacks.contextReply ?? null;
+		this.#layoutMode =
+			callbacks.layout ?? (callbacks.contextReply !== undefined ? "mimic" : "fullscreen");
 		this.#buffer = new EditBuffer(initialText, {
 			now: this.#now,
 			services: hostTextServices,
@@ -307,11 +316,33 @@ export class MouseEditModal implements Component, Focusable {
 		return vLines;
 	}
 
+	#getBoxStartRow(): number {
+		if (this.#layoutMode !== "mimic" || this.#lastRenderHeight < 8) {
+			return 0;
+		}
+		const draftLines = this.#getVisualLines().length;
+		const maxBoxTextHeight = Math.min(
+			10,
+			Math.max(3, Math.floor(this.#lastRenderHeight * 0.4)),
+		);
+		const boxTextHeight = Math.max(2, Math.min(maxBoxTextHeight, draftLines));
+		return Math.max(0, this.#lastRenderHeight - (boxTextHeight + 2));
+	}
+
+	#getTextAreaHeight(): number {
+		if (this.#layoutMode !== "mimic" || this.#lastRenderHeight < 8) {
+			return Math.max(1, this.#lastRenderHeight - 2);
+		}
+		const boxStartRow = this.#getBoxStartRow();
+		return Math.max(1, this.#lastRenderHeight - boxStartRow - 2);
+	}
+
 	#hitTest(screenRow: number, screenCol: number): number {
 		const vLines = this.#getVisualLines();
 		if (vLines.length === 0) return 0;
 
-		const targetVRow = screenRow - 1 + this.#scrollOffset;
+		const boxStartRow = this.#getBoxStartRow();
+		const targetVRow = screenRow - 1 - boxStartRow + this.#scrollOffset;
 		if (targetVRow < 0) {
 			return vLines[0].startOffset;
 		}
@@ -369,7 +400,7 @@ export class MouseEditModal implements Component, Focusable {
 			}
 		}
 
-		const viewHeight = Math.max(1, this.#lastRenderHeight - 2);
+		const viewHeight = this.#getTextAreaHeight();
 		if (cursorVRow < this.#scrollOffset) {
 			this.#scrollOffset = cursorVRow;
 		} else if (cursorVRow >= this.#scrollOffset + viewHeight) {
@@ -379,11 +410,20 @@ export class MouseEditModal implements Component, Focusable {
 
 	#handleMouse(event: SgrMouseEvent): void {
 		const totalRows = this.#lastRenderHeight;
-		const textAreaHeight = Math.max(1, totalRows - 2);
+		const textAreaHeight = this.#getTextAreaHeight();
 		const maxScroll = Math.max(0, this.#getVisualLines().length - textAreaHeight);
 
 		// Wheel scroll
 		if (event.wheel !== null) {
+			const boxStartRow = this.#getBoxStartRow();
+			if (this.#layoutMode === "mimic" && event.row < boxStartRow) {
+				this.#topScrollOffset = Math.max(
+					0,
+					this.#topScrollOffset + event.wheel * 2,
+				);
+				this.#tui.requestRender();
+				return;
+			}
 			this.#scrollOffset = Math.max(
 				0,
 				Math.min(maxScroll, this.#scrollOffset + event.wheel * 3),
@@ -790,14 +830,108 @@ export class MouseEditModal implements Component, Focusable {
 
 		const lines: string[] = [];
 
-		// Header (row 0)
+		if (this.#layoutMode === "mimic" && totalRows >= 8) {
+			const boxStartRow = this.#getBoxStartRow();
+			const boxTextHeight = this.#getTextAreaHeight();
+			const vLines = this.#getVisualLines();
+			const sel = this.#buffer.selection;
+			const cursor = this.#buffer.cursor;
+
+			// Top Context Area: Render previous reply card if available, else snapshot or blank
+			if (this.#contextReply) {
+				lines.push(
+					truncateToWidth(
+						" ╭── 上一次回复 (Agent Reply) ───────────────────────────────────╮",
+						width,
+						"",
+						true,
+					),
+				);
+				const replyLines = this.#contextReply.split("\n");
+				const maxReplyRows = Math.max(1, boxStartRow - 2);
+				for (let r = 0; r < maxReplyRows; r++) {
+					const idx = this.#topScrollOffset + r;
+					const content = idx < replyLines.length ? ` │ ${replyLines[idx]}` : " │";
+					lines.push(truncateToWidth(content, width - 2, "", true) + " │");
+				}
+				lines.push(
+					truncateToWidth(
+						" ╰───────────────────────────────────────────────────────────────╯",
+						width,
+						"",
+						true,
+					),
+				);
+			} else {
+				const snapshot = captureHostSnapshot(this.#tui);
+				for (let r = 0; r < boxStartRow; r++) {
+					const snapLine = snapshot && r < snapshot.lines.length ? snapshot.lines[r] : "";
+					lines.push(truncateToWidth(snapLine ?? "", width, "", true));
+				}
+			}
+
+			// Bottom Mimic Editor Box
+			let title =
+				" ╭── 鼠标编辑 (Alt+E) ── Ctrl+Q 保存 · Esc 取消 ──────────────────────────╮";
+			if (this.#errorMessage) {
+				title = ` ╭── [错误] ${this.#errorMessage} ─────────────────────────────╮`;
+			}
+			lines.push(truncateToWidth(title, width, "", true));
+
+			for (let row = 0; row < boxTextHeight; row++) {
+				const vIndex = this.#scrollOffset + row;
+				if (vIndex >= vLines.length) {
+					lines.push(truncateToWidth(" │", width - 2, "", true) + " │");
+					continue;
+				}
+
+				const vLine = vLines[vIndex];
+				let lineContent = " │ ";
+				let cursorDrawn = false;
+
+				for (const cell of vLine.cells) {
+					const isCellSelected =
+						sel !== null && cell.startOffset >= sel.start && cell.endOffset <= sel.end;
+					const isCursorOnCell = sel === null && cursor === cell.startOffset;
+
+					if (isCellSelected || isCursorOnCell) {
+						lineContent += `\x1b[7m${cell.text}\x1b[27m`;
+						if (isCursorOnCell) cursorDrawn = true;
+					} else {
+						lineContent += cell.text;
+					}
+				}
+
+				if (sel === null && !cursorDrawn) {
+					const isCursorAtEndOfLine =
+						vLine.cells.length === 0
+							? cursor === vLine.startOffset
+							: vLine.hasTrailingNewline
+								? cursor === vLine.endOffset - 1
+								: cursor === vLine.endOffset;
+					if (isCursorAtEndOfLine) {
+						lineContent += "\x1b[7m \x1b[27m";
+					}
+				}
+
+				lines.push(truncateToWidth(lineContent, width - 2, "", true) + " │");
+			}
+
+			const footer = this.#errorMessage
+				? ` ╰── [错误] ${this.#errorMessage} (按 Esc 退出) ──────────────╯`
+				: " ╰── Ctrl+Enter / Ctrl+Q 保存 ─ Esc 放弃 ──────────────────────────────╯";
+			lines.push(truncateToWidth(footer, width, "", true));
+
+			return lines;
+		}
+
+		// Classic Fullscreen Layout
 		let title = " ── 鼠标编辑浮层 ──────────────────────────────────────────";
 		if (this.#errorMessage) {
 			title = ` ── [错误] ${this.#errorMessage} ──────────────────────────`;
 		}
 		lines.push(truncateToWidth(title, width, "", true));
 
-		// Text area (rows 1 to totalRows - 2)
 		const textAreaHeight = totalRows - 2;
 		const vLines = this.#getVisualLines();
 		const sel = this.#buffer.selection;
@@ -811,7 +945,7 @@ export class MouseEditModal implements Component, Focusable {
 			}
 
 			const vLine = vLines[vIndex];
-			let lineContent = " "; // 1-column left margin
+			let lineContent = " ";
 			let cursorDrawn = false;
 
 			for (const cell of vLine.cells) {
@@ -827,7 +961,6 @@ export class MouseEditModal implements Component, Focusable {
 				}
 			}
 
-			// If cursor is at the end of this visual line or line is empty
 			if (sel === null && !cursorDrawn) {
 				const isCursorAtEndOfLine =
 					vLine.cells.length === 0
@@ -843,12 +976,11 @@ export class MouseEditModal implements Component, Focusable {
 			lines.push(truncateToWidth(lineContent, width, "", true));
 		}
 
-		// Footer (row totalRows - 1)
 		const footer = this.#errorMessage
 			? ` [错误] ${this.#errorMessage} (按 Esc 退出)`
 			: " Alt+E 打开 | Ctrl+Enter/Ctrl+Q 保存 | Esc 取消 | 鼠标无响应时请检查终端 SGR 鼠标支持";
 		lines.push(truncateToWidth(footer, width, "", true));
 
 		return lines;
-	}
+}
 }

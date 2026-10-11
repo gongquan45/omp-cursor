@@ -22,7 +22,7 @@ export const PLACEHOLDER_REGEX = /\[(Image|Video|Paste) #([1-9]\d*)(?:,[^\]\n]*)
 
 /** Matches an expanded attachment marker, a compact attachment chip, or a skill chip. */
 export const COMPOSER_TOKEN_REGEX =
-	/\[(Image|Video|Paste) #([1-9]\d*)(?:,[^\]\n]*)?\]|(?:🖼||(?<![A-Za-z])\x69mg|🎞||(?<![A-Za-z])\x76id|📄||(?<![A-Za-z])\x74xt) #[1-9]\d*|(?:✦||(?<![A-Za-z])\x53K) ([\w-]+(?:\.[\w-]+)*)(?![\w-])/gu;
+	/\[(Image|Video|Paste) #([1-9]\d*)(?:,[^\]\n]*)?\]|(?:🖼||(?<![A-Za-z])\x69mg|🎞||(?<![A-Za-z])\x76id|📄||(?<![A-Za-z])\x74xt) #[1-9]\d*|(?:✦||(?<![A-Za-z])\x53K) ([\w-]+(?:\.[\w-]+)*(?:\/[\w-]+(?:\.[\w-]+)*)?)(?![\w-])/gu;
 
 /**
  * Normalizes and sanitizes text for pasting:

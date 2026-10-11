@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { copyToClipboard } from "@oh-my-pi/pi-coding-agent/utils/clipboard";
 import { MouseEditModal } from "./mouse-edit-modal";
+import { AssistantMessageCache } from "./host/message-cache";
 
 export interface ModalResult {
 	saved: boolean;
@@ -8,6 +9,9 @@ export interface ModalResult {
 }
 
 export default function activate(pi: ExtensionAPI): void {
+	const messageCache = new AssistantMessageCache();
+	messageCache.bind(pi);
+
 	pi.registerShortcut("alt+e", {
 		description: "Open mouse-driven full-screen editor overlay for current draft",
 		handler: async (ctx: ExtensionContext) => {
@@ -20,6 +24,7 @@ export default function activate(pi: ExtensionAPI): void {
 			await ctx.ui.custom<ModalResult | undefined>(
 				(tui, _theme, _keybindings, done) => {
 					const modal = new MouseEditModal(tui, original, {
+						contextReply: messageCache.lastText,
 						onSave: (newText: string) => {
 							const current = ctx.ui.getEditorText();
 							if (current !== original) {
