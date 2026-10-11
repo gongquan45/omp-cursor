@@ -522,23 +522,22 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		expect(modal.buffer.cursor).toBe(6); // lands precisely on 'b' in 'beta'!
 	});
 
-	it("renders host snapshot using screenTop without being blanked by windowTop", () => {
+	it("renders real host snapshot from frameProvider replay starting at screen row 0", () => {
 		const term = new MinimalTerminal();
 		term.columns = 80;
 		term.rows = 24;
 		const tui = new TUI(term);
 
-		Object.assign(tui, {
-			getDebugPaint: () => ({
-				lines: ["Committed header line", "Visible status line"],
-				windowTop: 200, // large scroll offset in long document
-				altScreen: false,
+		// Drive a real frameProvider replay (like OMP does when displaying chat history)
+		tui.setFrameProvider({
+			renderFrame: () => ({
+				history: { id: 1, kind: "replay", rows: ["Committed history at top"] },
+				viewport: ["Composer at bottom"],
 			}),
-			getMutableViewport: () => ({
-				top: 1,
-				length: 2,
-			}),
+			acknowledgeHistory: () => {},
 		});
+
+		tui.renderNow();
 
 		const modal = new MouseEditModal(tui, "short draft", {
 			contextReply: null,
@@ -552,8 +551,8 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 
 		const lines = modal.render(80);
 		expect(lines.length).toBe(24);
-		expect(lines[1]?.includes("Committed header line")).toBe(true);
-		expect(lines[2]?.includes("Visible status line")).toBe(true);
+		// Row 0 in the top area must contain the real history line from row 0 of the snapshot!
+		expect(lines[0]?.includes("Committed history at top")).toBe(true);
 	});
 
 	it("soft-wraps long single-paragraph context replies and scrolls to the end", () => {
