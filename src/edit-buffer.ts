@@ -1,4 +1,5 @@
 import { EditBuffer as CoreEditBuffer } from "./core/edit-buffer";
+import { resolveTextServices } from "./core/default-text-services";
 import { hostTextServices } from "./host/text-services";
 import type { EditBufferOptions } from "./core/types";
 
@@ -9,7 +10,7 @@ export class EditBuffer extends CoreEditBuffer {
 	constructor(initialText: string, options?: EditBufferOptions) {
 		super(initialText, {
 			...options,
-			services: { ...hostTextServices, ...options?.services },
+			services: resolveTextServices(options?.services, hostTextServices),
 		});
 	}
 }

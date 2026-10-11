@@ -3,6 +3,7 @@ import type { TUI } from "@oh-my-pi/pi-tui";
 export interface ViewportSnapshot {
 	lines: readonly string[];
 	windowTop: number;
+	altScreen?: boolean;
 }
 
 /**
@@ -17,6 +18,7 @@ export function captureHostSnapshot(tui: TUI): ViewportSnapshot | undefined {
 				return {
 					lines: paint.lines,
 					windowTop: paint.windowTop ?? 0,
+					altScreen: paint.altScreen,
 				};
 			}
 		} catch {

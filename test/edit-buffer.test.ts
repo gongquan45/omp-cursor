@@ -6,6 +6,7 @@ import {
 	getWordRangeAt,
 	sanitizePasteText,
 } from "../src/edit-buffer";
+import { EditBuffer as CoreEditBuffer } from "../src/core/edit-buffer";
 
 describe("EditBuffer - Text Model", () => {
 	it("handles UTF-16, combining diacritics, Chinese double-width, and emoji", () => {
@@ -191,5 +192,27 @@ describe("EditBuffer - Text Model", () => {
 		// Double-click on combining mark selects entire word "cafe\u0301"
 		const range = getWordRangeAt(text, 4);
 		expect(text.slice(range.start, range.end)).toBe("cafe\u0301");
+	});
+	it("verifies pure standalone CoreEditBuffer operates with zero host injection", () => {
+		const text = "pure core standalone text";
+		const coreBuf = new CoreEditBuffer(text);
+		expect(coreBuf.cursor).toBe(text.length);
+		coreBuf.moveWordLeft();
+		expect(coreBuf.cursor).toBe(text.lastIndexOf("text"));
+		coreBuf.select(0, 4);
+		coreBuf.replaceSelection("super");
+		expect(coreBuf.text).toBe("super core standalone text");
+		coreBuf.undo();
+		expect(coreBuf.text).toBe(text);
+	});
+
+	it("preserves host defaults when bridge options contain undefined service properties", () => {
+		// With undefined override, hostTextServices.moveWordLeft should be preserved
+		const buffer = new EditBuffer("can't stop", {
+			services: { moveWordLeft: undefined },
+		});
+		buffer.setCaret(5); // after "can't"
+		buffer.moveWordLeft();
+		expect(buffer.cursor).toBe(0);
 	});
 });
