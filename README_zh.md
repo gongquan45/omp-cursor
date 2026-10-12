@@ -73,9 +73,18 @@
 
 ## 安装方法
 
-### 方式 A：直接克隆到 OMP 扩展目录（推荐）
+### 方式 A：一行命令官方插件安装（最推荐）
 
-OMP 启动时会自动扫描 `~/.omp/agent/extensions/` 下的插件：
+任何 OMP / Pi 用户只需在终端执行一行命令，自动下载依赖并常驻就绪：
+
+```bash
+omp plugin install github:gongquan45/omp-cursor
+```
+*(如果使用的是 Pi 原版，命令同样为 `pi plugin install github:gongquan45/omp-cursor`)*
+
+---
+
+### 方式 B：手动克隆至 OMP 扩展目录
 
 ```bash
 # 1. 克隆到 OMP 插件目录
@@ -85,8 +94,6 @@ git clone https://github.com/gongquan45/omp-cursor.git ~/.omp/agent/extensions/o
 cd ~/.omp/agent/extensions/omp-cursor
 bun install
 ```
-
-安装完成后，在任意终端启动 `omp` 就会自动加载。
 
 ### 方式 B：在配置文件中指定本地路径
 

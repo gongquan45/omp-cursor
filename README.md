@@ -73,9 +73,18 @@ Many terminal extensions solve mouse input by displaying a fullscreen alternate-
 
 ## Installation
 
-### Method A: Clone into OMP extensions directory (Recommended)
+### Method A: One-line plugin install (Recommended)
 
-OMP automatically loads extensions located in `~/.omp/agent/extensions/`:
+Install and resolve dependencies with a single command:
+
+```bash
+omp plugin install github:gongquan45/omp-cursor
+```
+*(If using upstream Pi, the command is `pi plugin install github:gongquan45/omp-cursor`)*
+
+---
+
+### Method B: Manual clone to extensions directory
 
 ```bash
 # 1. Clone into OMP extensions directory
@@ -85,8 +94,6 @@ git clone https://github.com/gongquan45/omp-cursor.git ~/.omp/agent/extensions/o
 cd ~/.omp/agent/extensions/omp-cursor
 bun install
 ```
-
-Once installed, launching `omp` in any terminal will automatically load the extension.
 
 ### Method B: Configure local path
 
