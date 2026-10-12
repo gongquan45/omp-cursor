@@ -209,4 +209,35 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		// capturesInput must return false so Vim gets 100% priority
 		expect(editor.capturesInput("\x1b[<0;10;24M")).toBe(false);
 	});
+
+	it("relinquishes tracking and mouse dispatch when setVimMode(true) is enabled after mouse was active", () => {
+		const term = new MinimalTerminal();
+		term.columns = 80;
+		term.rows = 24;
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+		editor.setText("first line\nsecond line");
+
+		// 1. Activate mouse first
+		editor.setMouseActive(true);
+		expect(editor.mouseActive).toBe(true);
+		expect(editor.isMouseEnabled).toBe(true);
+		expect(editor.capturesInput("\x1b[<0;10;24M")).toBe(true);
+
+		// 2. Enable real Vim mode via native setVimMode(true)
+		editor.setVimMode(true);
+		expect(editor.vimEnabled).toBe(true);
+		expect(editor.isMouseEnabled).toBe(false);
+		expect(editor.capturesInput("\x1b[<0;10;24M")).toBe(false);
+
+		// 3. Render: mode badge must NOT be present on top border
+		const lines = editor.render(80);
+		expect(lines[0]?.includes("🖱")).toBe(false);
+		expect(lines[0]?.includes("[MOUSE]")).toBe(false);
+
+		// 4. Feed SGR click: cursor must NOT be moved by mouse editor
+		const cursorBefore = editor.getCursor();
+		editor.handleInput("\x1b[<0;5;23M");
+		expect(editor.getCursor()).toEqual(cursorBefore);
+	});
 });

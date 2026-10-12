@@ -306,7 +306,7 @@ export class NativeMouseEditor extends CustomEditor {
 	}
 
 	override handleInput(data: string): void {
-		if (data.startsWith("\x1b[<")) {
+		if (this.isMouseEnabled && data.startsWith("\x1b[<")) {
 			const event = parseSgrMouse(data);
 			if (event) {
 				this.#handleSgrMouse(event);

@@ -24,7 +24,7 @@ export default function activate(pi: ExtensionAPI): void {
 			ctx.ui.setEditorComponent((tui, theme, keybindings) => {
 				const editor = new NativeMouseEditor(tui, theme, keybindings);
 				activeNativeEditor = editor;
-				tui.setInlineMouseTrackingProvider(() => editor.mouseActive);
+				tui.setInlineMouseTrackingProvider(() => editor.isMouseEnabled);
 				return editor;
 			});
 		});
