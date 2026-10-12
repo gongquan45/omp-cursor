@@ -34,19 +34,25 @@
 
 ### 1. 安装与配置
 
-#### 方案 A：单次运行
+#### 方案 A：直接克隆至 OMP 扩展目录（自动常驻）
+OMP 会自动扫描 `~/.omp/agent/extensions/` 目录下的所有插件：
 ```bash
-omp -e "E:/Desktop/New folder"
-```
+# 克隆仓库至 OMP 插件目录
+git clone https://github.com/<your-username>/omp-cursor.git ~/.omp/agent/extensions/omp-cursor
 
-#### 方案 B：全局持久化（推荐）
-在 OMP 用户主配置文件 `%USERPROFILE%\.omp\agent\config.yml`（对应 `~/.omp/agent/config.yml`）中添加插件路径：
+# 安装依赖
+cd ~/.omp/agent/extensions/omp-cursor
+bun install
+```
+安装后在任何地方启动 `omp` 均会自动加载就绪！
+
+#### 方案 B：在配置文件中指定本地路径
+若克隆在自定义目录，在 OMP 用户主配置文件 `~/.omp/agent/config.yml`（Windows 为 `%USERPROFILE%\.omp\agent\config.yml`）中添加插件绝对路径：
 ```yaml
 extensions:
-  - E:/Desktop/New folder
+  - /path/to/omp-cursor
 ```
 *(注：若使用 JSON 配置，亦可在同目录 `settings.json` 的 `"extensions"` 数组中配置)*
-
 ---
 
 ### 2. 日常交互

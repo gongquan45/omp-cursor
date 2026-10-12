@@ -1,7 +1,18 @@
 {
   "name": "omp-cursor",
   "version": "0.2.1",
-  "private": true,
+  "description": "In-place native mouse editing extension for Oh-My-Pi (OMP)",
+  "license": "MIT",
+  "keywords": [
+    "omp",
+    "oh-my-pi",
+    "extension",
+    "plugin",
+    "mouse",
+    "cursor",
+    "tui"
+  ],
+  "private": false,
   "type": "module",
   "scripts": {
     "test": "bun test",
