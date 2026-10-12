@@ -1,78 +1,115 @@
-# OMP 光标漫游 (`omp-cursor`) v0.2.1
+[English](README.md) | [简体中文](README_zh.md)
 
-为 [Oh-My-Pi (OMP)](https://omp.sh) 打造的原生输入框鼠标编辑扩展。让终端光标指哪打哪，在 OMP 原生主界面中实现像素级精准的点选、划词高亮、选区替换与剪贴板互通。
+# omp-cursor
 
-## 核心特性与亮点
-
-### 1. 原生原位编辑（零弹窗、零换页）
-- **100% 保持 OMP 原生质感**：按下 `Alt+E` 时，画面**不切换屏幕、不弹出突兀的第三方线框**；
-- 温暖的主题底色、彩色的 OMP Logo、多轮问答气泡、青蓝色的原生状态线全部纹丝不动；
-- 鼠标直接在原位输入框内单击跳跃、按住拖拽拉出高亮选区（`\x1b[7m` 反显），打字或按 Backspace 直接覆盖/删除选区。
-
-### 2. 状态栏双态徽标（键盘 ⌨ ↔ 鼠标 🖱 · Vim 专属槽位）
-- **与 Vim 模式对称的黄金位置**：指示符精准安放在状态栏的第二槽位（`π > ⌨/🖱 > 🖥 Outerwall`），与 OMP 原生 Vim 模式徽标（`π > | > ...`）的位置完全一致；
-- **双态自适应反馈**：
-  - 默认状态：显示 ` ⌨ `（键盘图标），优雅传达“插件已就绪，当前为键盘输入模式”；
-  - 激活状态：按 `Alt+E` 后无缝切为 ` 🖱 `（鼠标图标），指示当前可进行鼠标划词编辑；
-- **支持三种形态（可通过 `/cursor` 命令自由配置）**：
-  - `icon`（默认）：` ⌨ ` ↔ ` 🖱 `；
-  - `text`：` [KB] ` ↔ ` [MOUSE] `；
-  - `hidden`：完全隐藏指示符（零宽度占用），适合极致极简主义；
-- **全预设分隔符自适应与背景无损保真**：完美支持 ASCII（`>`）、Unicode Powerline（`▶`、`▕`、`┆`）、NerdFont 等所有官方状态栏样式，且彻底修复 ANSI 控制码，状态栏深色背景条 100% 连贯不中断。
-### 3. 智能检测 Vim 模式（零冲突互斥）
-- 自动探测 OMP 的 Vim 编辑状态（`editor.vimEnabled`）；
-- 当检测到 Vim 模式开启时，鼠标编辑模式强制停用，按 `Alt+E` 安全跳过，鼠标事件完全让渡给宿主，绝不与 Vim 模式机冲突。
-
-### 4. 严密的 Unicode 算法（中英文与 Emoji 零偏差）
-- 彻底解决终端列数（Visual Cells）与内存字符索引（UTF-16 Code Units）的失配；
-- 汉字、日韩文字与 Emoji 双宽字符（2 列宽）采用中界点平滑换算，选词与定位绝无 2 倍漂移；
-- 附件芯片（`[Image #N]`、`[Paste #N]`、以及 OMP 18.9+ 命名空间技能 `✦ org/skill`）作为原子整体保护，选区不割裂。
+In-place mouse cursor positioning, drag-to-highlight selection, and text editing directly inside the native [Oh-My-Pi (OMP)](https://omp.sh) prompt box.
 
 ---
 
-## 快速上手
+## Why this exists
 
-### 1. 安装与配置
+Editing long drafts, pasted code snippets, or detailed prompts in a terminal can be tedious. When you spot a typo in the middle of a sentence, holding the left arrow key for seconds gets old quickly.
 
-#### 方案 A：直接克隆至 OMP 扩展目录（自动常驻）
-OMP 会自动扫描 `~/.omp/agent/extensions/` 目录下的所有插件：
+`omp-cursor` adds direct mouse support to OMP's native editor:
+- Click anywhere to jump the cursor directly to that character;
+- Drag to highlight text, double-click to select words, triple-click to select lines;
+- Type over selections to replace them immediately, or press Backspace to delete;
+- Operates in-place on OMP's live interface—no popups, no screen switching, no jarring UI shifts.
+
+---
+
+## Controls & Gestures
+
+| Action | Key / Mouse Gesture | Description |
+| :--- | :--- | :--- |
+| **Toggle Mode** | `Alt+E` | Toggles mouse editing mode. Status bar icon switches from `⌨` to `🖱`. |
+| **Position Cursor**| Click | Jumps caret immediately. CJK characters and Emoji are aligned by visual cell width. |
+| **Highlight Text** | Drag | Drags to select text with reverse-video (`\x1b[7m`) highlighting. |
+| **Quick Select** | Double / Triple Click | Double-click selects the word; triple-click selects the whole line. |
+| **Edit Selection** | Type / `Backspace` | Typing replaces the active selection; Backspace/Delete removes it. |
+| **Copy Text** | `Ctrl+C` | Copies active selection to the OS clipboard. |
+| **Save & Exit** | `Esc` or `Alt+E` | Exits mouse mode while preserving all edits (switches back to `⌨`). |
+| **Discard & Exit**| `Ctrl+D` | Discards edits made in mouse mode and reverts the draft to its initial snapshot. |
+
+---
+
+## Status Bar Indicator (`/cursor`)
+
+The mode badge occupies the exact status-line segment slot where OMP's built-in Vim mode appears (`π > ⌨/🖱 > hostname ...`).
+
+You can customize the indicator style at any time using the `/cursor` command:
+
+- `/cursor icon` (default): Shows muted `⌨` in regular typing mode, switching to cyan `🖱` when mouse mode is active.
+- `/cursor text`: Text style. Shows `[KB]` normally, switching to `[MOUSE]` when active.
+- `/cursor hidden`: Hides the indicator entirely for minimalists, while preserving full mouse clicking and highlighting.
+
+---
+
+## Vim Mode Compatibility
+
+If OMP's built-in Vim mode is enabled (`tui.vim: true`):
+
+`omp-cursor` detects it automatically and yields control. `Alt+E` will not intercept keys, and mouse reports will not conflict with Vim's modal state machine or operator-pending gestures.
+
+---
+
+## Technical Design
+
+Many terminal extensions solve mouse input by displaying a fullscreen alternate-screen overlay. While simpler to implement, an overlay completely replaces the terminal screen, hiding the OMP logo, chat history, and active theme colors.
+
+`omp-cursor` stays in-place on the normal buffer:
+1. **In-Place Hook**: Extends OMP's `CustomEditor` via `setEditorComponent`, keeping OMP's native status bar and composer frame intact.
+2. **Input Capture**: Uses `capturesInput` to intercept SGR mouse reports before host listeners can swallow them.
+3. **Native Editing & Undo**: Calls `applyHostEdit` for cursor movements and selection replacements, integrating directly with OMP's native undo history.
+4. **Visual Cell Alignment**: CJK ideographs take two terminal columns but one UTF-16 code unit. We map visual cells using Unicode Grapheme segmentation, eliminating the 2x coordinate drift common in naive column calculations.
+
+---
+
+## Known Trade-offs
+
+- **Terminal-Native Selection**: While mouse mode is active, the terminal reports clicks to the application instead of selecting text locally. To copy text from earlier chat history, simply press `Esc` to exit mouse mode, or hold your terminal's `Shift` key while dragging.
+
+---
+
+## Installation
+
+### Method A: Clone into OMP extensions directory (Recommended)
+
+OMP automatically loads extensions located in `~/.omp/agent/extensions/`:
+
 ```bash
-# 克隆仓库至 OMP 插件目录
+# 1. Clone into OMP extensions directory
 git clone https://github.com/<your-username>/omp-cursor.git ~/.omp/agent/extensions/omp-cursor
 
-# 安装依赖
+# 2. Install dependencies
 cd ~/.omp/agent/extensions/omp-cursor
 bun install
 ```
-安装后在任何地方启动 `omp` 均会自动加载就绪！
 
-#### 方案 B：在配置文件中指定本地路径
-若克隆在自定义目录，在 OMP 用户主配置文件 `~/.omp/agent/config.yml`（Windows 为 `%USERPROFILE%\.omp\agent\config.yml`）中添加插件绝对路径：
+Once installed, launching `omp` in any terminal will automatically load the extension.
+
+### Method B: Configure local path
+
+If cloned to a custom directory, add the absolute path to your user configuration `~/.omp/agent/config.yml` (on Windows: `%USERPROFILE%\.omp\agent\config.yml`):
+
 ```yaml
 extensions:
   - /path/to/omp-cursor
 ```
-*(注：若使用 JSON 配置，亦可在同目录 `settings.json` 的 `"extensions"` 数组中配置)*
+
 ---
 
-### 2. 日常交互
+## Development & Testing
 
-1. **激活光标漫游**：在输入框中按 **`Alt+E`**，状态栏指示符从 `⌨` 切换为 `🖱`；
-2. **鼠标定位**：直接单击任意字符，光标瞬间跳至目标位置；
-3. **划词选区**：按住鼠标左键拖动，拉出高亮选区；
-4. **快捷选择**：
-   - 500ms 内双击：自动选中当前词组；
-   - 500ms 内三击：选中整行；
-5. **快捷编辑**：
-   - `Backspace` / `Delete`：一键整段删除选中内容；
-   - 直接敲键盘：直接用新键入字符替换整个选区；
-   - `Ctrl+C`：当存在选区时，复制选中文字到系统剪贴板；
-6. **自动保存并退出**：按 **`Esc`** 或 **`Ctrl+Q`**，保留所有修改并退出鼠标模式（切回 `⌨`）；
-7. **放弃修改并退出**：按 **`Ctrl+D`**，丢弃本次鼠标编辑修改，自动恢复进入鼠标模式前的草稿快照并退出；
-8. **切换显示模式**：在会话中输入 `/cursor icon`、`/cursor text` 或 `/cursor hidden` 即可随时调整徽标形态。
+Run the full automated test suite using Bun:
+
+```bash
+bun test          # Runs all 55 integration and unit tests
+bun run typecheck # Strict TypeScript check
+```
+
 ---
 
-## 开发与验证
+## License
 
-- 类型检查：`bun run typecheck`
-- 全量自动化测试：`bun test`（全套 54 项测试 100% 绿灯）
+[MIT License](LICENSE)
