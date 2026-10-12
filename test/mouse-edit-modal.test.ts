@@ -93,7 +93,7 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		expect(savedResult).toEqual("alpha 🙂 tail");
 	});
 
-	it("handles cancellation via Esc leaving original intact", () => {
+	it("handles cancellation via Ctrl+D leaving original intact", () => {
 		const term = new MinimalTerminal();
 		const tui = new TUI(term);
 
@@ -113,15 +113,39 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		});
 
 		modal.render(80);
-		// Type some characters
 		modal.handleInput("X");
 		modal.handleInput("Y");
 		expect(modal.buffer.text).toBe("original textXY");
 
-		// Press Esc
-		modal.handleInput("\x1b");
+		// Press Ctrl+D to discard
+		modal.handleInput("\x04");
 		expect(cancelled).toBe(true);
 		expect(saved).toBe(false);
+	});
+
+	it("handles auto-save via Esc", () => {
+		const term = new MinimalTerminal();
+		const tui = new TUI(term);
+
+		let saved = false;
+		const modal = new MouseEditModal(tui, "original text", {
+			onSave: () => {
+				saved = true;
+				return true;
+			},
+			onCancel: () => {},
+			copy: async () => {},
+			setInterval: () => 0,
+			clearTimer: () => {},
+		});
+
+		modal.render(80);
+		modal.handleInput("!");
+		expect(modal.buffer.text).toBe("original text!");
+
+		// Press Esc to auto-save
+		modal.handleInput("\x1b");
+		expect(saved).toBe(true);
 	});
 
 	it("double-click selects word and triple-click selects whole line", () => {

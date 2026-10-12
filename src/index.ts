@@ -29,6 +29,18 @@ export default function activate(pi: ExtensionAPI): void {
 			});
 		});
 	}
+	if (typeof pi?.registerCommand === "function") {
+		pi.registerCommand("cursor", {
+			description: "Configure mouse edit indicator mode (icon, text, hidden)",
+			handler: async (args: string) => {
+				const mode = args.trim().toLowerCase();
+				if (mode === "icon" || mode === "text" || mode === "hidden") {
+					activeNativeEditor?.setIndicatorDisplay(mode);
+				}
+			},
+		});
+	}
+
 
 	pi.registerShortcut("alt+e", {
 		description: "Toggle mouse editing mode in the native prompt editor",

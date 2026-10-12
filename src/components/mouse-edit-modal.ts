@@ -659,14 +659,18 @@ export class MouseEditModal implements Component, Focusable {
 			return;
 		}
 
-		// Save Chords: Ctrl+Enter or Ctrl+Q
-		if (matchesKey(data, "ctrl+enter") || matchesKey(data, "ctrl+q")) {
+		// Save Chords: Ctrl+Enter, Ctrl+Q, or Escape (Auto-save)
+		if (
+			matchesKey(data, "ctrl+enter") ||
+			matchesKey(data, "ctrl+q") ||
+			matchesKey(data, "escape")
+		) {
 			this.#save();
 			return;
 		}
 
-		// Cancel Chord: Esc
-		if (matchesKey(data, "escape")) {
+		// Discard / Cancel Chord: Ctrl+D
+		if (matchesKey(data, "ctrl+d")) {
 			this.#cancel();
 			return;
 		}
@@ -979,8 +983,8 @@ export class MouseEditModal implements Component, Focusable {
 			}
 
 			const fallbackFooter = this.#errorMessage
-				? ` ╰── [错误] ${this.#errorMessage} (按 Esc 退出) ──────────────╯`
-				: " ╰── Ctrl+Enter / Ctrl+Q 保存 ─ Esc 放弃 ──────────────────────────────╯";
+				? ` ╰── [错误] ${this.#errorMessage} (按 Ctrl+D 退出) ──────────────╯`
+				: " ╰── Ctrl+Q / Esc 保存 ─ Ctrl+D 放弃 ──────────────────────────────╯";
 			lines.push(
 				chrome.bottomLine ?? truncateToWidth(fallbackFooter, width, "", true),
 			);
@@ -1039,8 +1043,8 @@ export class MouseEditModal implements Component, Focusable {
 		}
 
 		const footer = this.#errorMessage
-			? ` [错误] ${this.#errorMessage} (按 Esc 退出)`
-			: " Alt+E 打开 | Ctrl+Enter/Ctrl+Q 保存 | Esc 取消 | 鼠标无响应时请检查终端 SGR 鼠标支持";
+			? ` [错误] ${this.#errorMessage} (按 Ctrl+D 退出)`
+			: " Alt+E 打开 | Ctrl+Q/Esc 保存 | Ctrl+D 放弃 | 鼠标无响应时请检查终端 SGR 鼠标支持";
 		lines.push(truncateToWidth(footer, width, "", true));
 
 		return lines;

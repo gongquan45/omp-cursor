@@ -157,7 +157,7 @@ describe("Extension Entrypoint (src/index.ts)", () => {
 		});
 	});
 
-	it("cancels without writing back on Esc", async () => {
+	it("cancels without writing back on Ctrl+D", async () => {
 		let registeredHandler: ((ctx: ExtensionContext) => Promise<void> | void) | null = null;
 		const stubApi = {
 			registerShortcut: (
@@ -202,8 +202,8 @@ describe("Extension Entrypoint (src/index.ts)", () => {
 
 				component.render(80);
 				component.handleInput("X");
-				// Press Esc
-				component.handleInput("\x1b");
+				// Press Ctrl+D
+				component.handleInput("\x04");
 
 				const result = await promise;
 				modalResult = result as ModalResult;
@@ -278,8 +278,8 @@ describe("Extension Entrypoint (src/index.ts)", () => {
 				// User tries to save
 				component.handleInput("\x11");
 
-				// User cancels with Esc after seeing error
-				component.handleInput("\x1b");
+				// User cancels with Ctrl+D after seeing error
+				component.handleInput("\x04");
 
 				const result = await promise;
 				return result;

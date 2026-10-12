@@ -96,6 +96,7 @@ export class NativeMouseEditor extends CustomEditor {
 	#clickCount = 0;
 	#upstreamTopBorderProvider?: ((availableWidth: number) => EditorTopBorder | undefined) | undefined = undefined;
 	#indicatorDisplay: IndicatorDisplayMode = "icon";
+	#draftSnapshotOnEnter: string | null = null;
 
 	constructor(
 		tui: TUI,
@@ -109,14 +110,22 @@ export class NativeMouseEditor extends CustomEditor {
 		this.#editBuffer = new EditBuffer("", { services: hostTextServices });
 		// Wrap setTopBorderProvider so [MOUSE 🖱️] dynamically prepends to the host StatusLine
 		super.setTopBorderProvider((availableWidth: number) => {
-			if (!this.isMouseEnabled || this.#indicatorDisplay === "hidden") {
+			if (this.vimEnabled || this.#indicatorDisplay === "hidden") {
 				return this.#upstreamTopBorderProvider?.(availableWidth);
 			}
 
-			const badge =
-				this.#indicatorDisplay === "text"
-					? "\x1b[1;36m[MOUSE]\x1b[0m"
-					: "\x1b[1;36m🖱\x1b[0m";
+			let badge: string;
+			if (this.#mouseActive) {
+				badge =
+					this.#indicatorDisplay === "text"
+						? "\x1b[1;36m[MOUSE]\x1b[39m\x1b[22m"
+						: "\x1b[1;36m🖱\x1b[39m\x1b[22m";
+			} else {
+				badge =
+					this.#indicatorDisplay === "text"
+						? "\x1b[38;2;160;160;160m[KB]\x1b[39m"
+						: "\x1b[38;2;160;160;160m⌨\x1b[39m";
+			}
 			const badgeWidth = visibleWidth(badge) + 3;
 			const innerWidth = availableWidth - badgeWidth;
 
@@ -189,6 +198,11 @@ export class NativeMouseEditor extends CustomEditor {
 	setMouseActive(active: boolean): void {
 		if (this.#mouseActive === active) return;
 		this.#mouseActive = active;
+		if (active) {
+			this.#draftSnapshotOnEnter = this.getText();
+		} else {
+			this.#draftSnapshotOnEnter = null;
+		}
 		this.#selection = null;
 		this.#isDragging = false;
 		this.#tui.requestRender();
@@ -360,8 +374,17 @@ export class NativeMouseEditor extends CustomEditor {
 		}
 
 		if (this.isMouseEnabled) {
-			// Esc or Ctrl+Q exits mouse mode
+			// Esc or Ctrl+Q: Auto-save and exit mouse mode
 			if (matchesKey(data, "escape") || matchesKey(data, "ctrl+q")) {
+				this.setMouseActive(false);
+				return;
+			}
+
+			// Ctrl+D: Discard edits and restore snapshot
+			if (matchesKey(data, "ctrl+d")) {
+				if (this.#draftSnapshotOnEnter !== null) {
+					this.setText(this.#draftSnapshotOnEnter);
+				}
 				this.setMouseActive(false);
 				return;
 			}

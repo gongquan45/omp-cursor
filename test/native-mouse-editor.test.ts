@@ -115,7 +115,7 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		// Initially without mouseActive
 		let lines = editor.render(80);
 		expect(lines[0]?.includes("Outerwall")).toBe(true);
-		expect(lines[0]?.includes("[MOUSE 🖱️]")).toBe(false);
+		expect(lines[0]?.includes("⌨")).toBe(true);
 
 		// Activate mouse mode
 		editor.setMouseActive(true);
@@ -124,6 +124,7 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		// Exit mouse mode
 		editor.setMouseActive(false);
 		lines = editor.render(80);
+		expect(lines[0]?.includes("⌨")).toBe(true);
 		expect(lines[0]?.includes("🖱")).toBe(false);
 		expect(lines[0]?.includes("Outerwall")).toBe(true);
 	});
@@ -264,5 +265,55 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		const resNoSep = injectBadgeIntoStatusLine(noSep, "🖱");
 		expect(resNoSep.content).toBe(" SimpleStatusTitle ");
 		expect(resNoSep.widthDiff).toBe(0);
+	});
+
+	it("discards edits and restores draft snapshot when Ctrl+D is pressed in mouse mode", () => {
+		const term = new MinimalTerminal();
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+		editor.setText("original draft");
+
+		editor.setMouseActive(true);
+		expect(editor.mouseActive).toBe(true);
+
+		// Type edits in mouse mode
+		editor.handleInput(" extra edits");
+		expect(editor.getText()).toBe("original draft extra edits");
+
+		// Press Ctrl+D -> discards edits and restores snapshot!
+		editor.handleInput("\x04");
+		expect(editor.mouseActive).toBe(false);
+		expect(editor.getText()).toBe("original draft");
+	});
+
+	it("auto-saves edits and exits mouse mode when Esc or Ctrl+Q is pressed", () => {
+		const term = new MinimalTerminal();
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+		editor.setText("original draft");
+
+		editor.setMouseActive(true);
+		editor.handleInput(" saved edits");
+
+		// Press Esc -> auto-saves!
+		editor.handleInput("\x1b");
+		expect(editor.mouseActive).toBe(false);
+		expect(editor.getText()).toBe("original draft saved edits");
+	});
+
+	it("preserves status line background color by avoiding \\x1b[0m resets in badge", () => {
+		const term = new MinimalTerminal();
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+
+		editor.setTopBorderProvider(availableWidth => ({
+			content: "\x1b[48;2;40;40;40m π > 🖥 Outerwall \x1b[49m",
+			width: 25,
+		}));
+
+		editor.setMouseActive(true);
+		const lines = editor.render(80);
+		// Crucial assertion: lines[0] must NOT contain \x1b[0m which wipes out background!
+		expect(lines[0]?.includes("\x1b[0m")).toBe(false);
 	});
 });
