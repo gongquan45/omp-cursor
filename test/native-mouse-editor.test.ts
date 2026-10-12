@@ -22,9 +22,10 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 
 		editor.toggleMouseMode();
 		expect(editor.mouseActive).toBe(true);
-		// Captures SGR mouse events when mouse mode is active
-		expect(editor.capturesInput("\x1b[<0;10;5M")).toBe(true);
-
+		// Captures SGR mouse events inside editor content rows
+		expect(editor.capturesInput("\x1b[<0;10;24M")).toBe(true);
+		// Ignores SGR mouse events outside editor (e.g. transcript rows)
+		expect(editor.capturesInput("\x1b[<0;10;5M")).toBe(false);
 		// Render to inspect top border
 		const lines = editor.render(80);
 		expect(lines[0]?.includes("[MOUSE 🖱️]")).toBe(true);
@@ -32,7 +33,7 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		// Esc disables mouse mode
 		editor.handleInput("\x1b");
 		expect(editor.mouseActive).toBe(false);
-		expect(editor.capturesInput("\x1b[<0;10;5M")).toBe(false);
+		expect(editor.capturesInput("\x1b[<0;10;24M")).toBe(false);
 	});
 
 	it("moves caret on SGR click and updates selection on drag", () => {
@@ -86,9 +87,9 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		editor.render(80);
 
 		// Drag over "world" (offset 6 to 11)
-		editor.handleInput("\x1b[<0;10;23M"); // click at 'w'
-		editor.handleInput("\x1b[<32;15;23M"); // drag to end
-		editor.handleInput("\x1b[<0;15;23m");
+		editor.handleInput("\x1b[<0;10;24M"); // click at 'w'
+		editor.handleInput("\x1b[<32;15;24M"); // drag to end
+		editor.handleInput("\x1b[<0;15;24m");
 		expect(editor.selection).not.toBeNull();
 
 		// Type 'earth'
@@ -137,20 +138,20 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		editor.render(80);
 
 		// 1. Click on '词一' (screen col 4 -> text col 1)
-		editor.handleInput("\x1b[<0;5;23M");
+		editor.handleInput("\x1b[<0;5;24M");
 		expect(editor.getCursor().col).toBe(1);
 
 		// 2. Click on '词二' (screen col 9 -> text col 6)
-		editor.handleInput("\x1b[<0;10;23M");
+		editor.handleInput("\x1b[<0;10;24M");
 		// Must land at '词二' (offset 4), NOT overshoot to '词四' (offset 7)!
 		expect(editor.getCursor().col).toBe(4);
 
 		// 3. Click on '词三' (screen col 14 -> text col 11)
-		editor.handleInput("\x1b[<0;15;23M");
+		editor.handleInput("\x1b[<0;15;24M");
 		expect(editor.getCursor().col).toBe(7);
 
 		// 4. Click on '词四' (screen col 19 -> text col 16)
-		editor.handleInput("\x1b[<0;20;23M");
+		editor.handleInput("\x1b[<0;20;24M");
 		expect(editor.getCursor().col).toBe(10);
 	});
 });

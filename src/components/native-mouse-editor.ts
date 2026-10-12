@@ -147,18 +147,51 @@ export class NativeMouseEditor extends CustomEditor {
 	 */
 	override capturesInput(data: string): boolean {
 		if (this.#mouseActive && data.startsWith("\x1b[<")) {
-			return true;
+			const event = parseSgrMouse(data);
+			if (event) {
+				return this.#isRowInsideEditor(event.row);
+			}
 		}
 		return false;
 	}
 
-	#getHitOffset(screenRow: number, screenCol: number): number {
+	#getLine0ScreenRow(): number {
+		if (typeof this.#tui.getMutableViewport === "function") {
+			const vp = this.#tui.getMutableViewport();
+			if (
+				vp &&
+				typeof vp.top === "number" &&
+				typeof vp.length === "number" &&
+				vp.length > 0
+			) {
+				const rendered = this.render(this.#tui.terminal.columns);
+				const editorBoxHeight = rendered.length;
+				return vp.top + vp.length - editorBoxHeight + 1;
+			}
+		}
+		const paint =
+			typeof this.#tui.getDebugPaint === "function"
+				? this.#tui.getDebugPaint()
+				: undefined;
+		if (paint?.cursor && typeof paint.cursor.y === "number") {
+			const cursor = this.getCursor();
+			return paint.cursor.y - cursor.line;
+		}
 		const totalRows = this.#tui.terminal.rows;
 		const rendered = this.render(this.#tui.terminal.columns);
 		const editorBoxHeight = rendered.length;
-		const editorStartRow = Math.max(0, totalRows - editorBoxHeight);
+		return Math.max(0, totalRows - editorBoxHeight + 1);
+	}
 
-		const contentRow = screenRow - (editorStartRow + 1);
+	#isRowInsideEditor(row: number): boolean {
+		const line0Row = this.#getLine0ScreenRow();
+		const lines = this.getLines();
+		return row >= line0Row && row < line0Row + lines.length;
+	}
+
+	#getHitOffset(screenRow: number, screenCol: number): number {
+		const line0Row = this.#getLine0ScreenRow();
+		const contentRow = screenRow - line0Row;
 		const textCol = Math.max(0, screenCol - 3);
 
 		const lines = this.getLines();
@@ -176,6 +209,9 @@ export class NativeMouseEditor extends CustomEditor {
 
 	#handleSgrMouse(event: SgrMouseEvent): void {
 		if (event.leftClick) {
+			if (!this.#isRowInsideEditor(event.row)) {
+				return;
+			}
 			const now = Date.now();
 			const hit = this.#getHitOffset(event.row, event.col);
 			if (now - this.#lastClickTime <= 500 && hit === this.#lastClickOffset) {
