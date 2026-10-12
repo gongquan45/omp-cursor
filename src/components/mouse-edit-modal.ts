@@ -20,7 +20,8 @@ import {
 } from "../core/edit-buffer";
 import { hostTextServices } from "../host/text-services";
 import { captureHostSnapshot, type ViewportSnapshot } from "../host/snapshot";
-
+import { buildNativeComposerChrome } from "../host/composer-style";
+import { formatSessionTranscript } from "../host/message-cache";
 export type TimerHandle = unknown;
 
 export interface MouseEditModalCallbacks {
@@ -32,6 +33,7 @@ export interface MouseEditModalCallbacks {
 	now?: () => number;
 	contextReply?: string | null;
 	layout?: "mimic" | "fullscreen";
+	branchEntries?: unknown[];
 }
 
 interface VisualCell {
@@ -70,6 +72,7 @@ export class MouseEditModal implements Component, Focusable {
 	readonly #contextReply: string | null;
 	readonly #layoutMode: "mimic" | "fullscreen";
 	readonly #normalSnapshot: ViewportSnapshot | undefined;
+	readonly #branchEntries?: unknown[];
 
 	// Mouse interaction state
 	#isDragging = false;
@@ -93,9 +96,15 @@ export class MouseEditModal implements Component, Focusable {
 		this.#tui = tui;
 		this.#callbacks = callbacks;
 		this.#now = callbacks.now ?? (() => Date.now());
-		this.#contextReply = callbacks.contextReply ?? null;
+		this.#branchEntries = callbacks.branchEntries;
+		this.#contextReply =
+			callbacks.contextReply ??
+			(callbacks.branchEntries ? formatSessionTranscript(callbacks.branchEntries) : null);
 		this.#layoutMode =
-			callbacks.layout ?? (callbacks.contextReply !== undefined ? "mimic" : "fullscreen");
+			callbacks.layout ??
+			(this.#contextReply !== null || callbacks.branchEntries !== undefined
+				? "mimic"
+				: "fullscreen");
 		this.#normalSnapshot = captureHostSnapshot(tui);
 		this.#buffer = new EditBuffer(initialText, {
 			now: this.#now,
@@ -875,7 +884,7 @@ export class MouseEditModal implements Component, Focusable {
 			const sel = this.#buffer.selection;
 			const cursor = this.#buffer.cursor;
 
-			// Top Context Area: Render previous reply card if available, else snapshot or blank
+			// Top Context Area: Render multi-turn context transcript, else snapshot or blank
 			if (this.#contextReply) {
 				const replyInnerWidth = Math.max(1, width - 6);
 				const replyLines = wrapTextWithAnsi(this.#contextReply, replyInnerWidth);
@@ -913,14 +922,23 @@ export class MouseEditModal implements Component, Focusable {
 				}
 			}
 
-			// Bottom Mimic Editor Box
-			let title =
-				" ╭── 鼠标编辑 (Alt+E) ── \x1b[1;36m[MOUSE 🖱️]\x1b[0m ── Ctrl+Q 保存 · Esc 放弃 ──────────────────╮";
-			if (this.#errorMessage) {
-				title = ` ╭── [错误] ${this.#errorMessage} ─────────────────────────────╮`;
-			}
-			lines.push(truncateToWidth(title, width, "", true));
-
+			// Bottom Mimic Editor Box via native ComposerStyle
+			const badge = this.#errorMessage
+				? ` [错误] ${this.#errorMessage} `
+				: " 鼠标编辑 (Alt+E) ── \x1b[1;36m[MOUSE 🖱️]\x1b[0m ── Ctrl+Q 保存 · Esc 放弃 ";
+			const chrome = buildNativeComposerChrome({
+				width,
+				badgeText: badge,
+			});
+			lines.push(
+				chrome.topLine ??
+					truncateToWidth(
+						` ╭── ${badge} ──────────────────────────╮`,
+						width,
+						"",
+						true,
+					),
+			);
 			for (let row = 0; row < boxTextHeight; row++) {
 				const vIndex = this.#scrollOffset + row;
 				if (vIndex >= vLines.length) {
@@ -960,11 +978,12 @@ export class MouseEditModal implements Component, Focusable {
 				lines.push(truncateToWidth(lineContent, width - 2, "", true) + " │");
 			}
 
-			const footer = this.#errorMessage
+			const fallbackFooter = this.#errorMessage
 				? ` ╰── [错误] ${this.#errorMessage} (按 Esc 退出) ──────────────╯`
 				: " ╰── Ctrl+Enter / Ctrl+Q 保存 ─ Esc 放弃 ──────────────────────────────╯";
-			lines.push(truncateToWidth(footer, width, "", true));
-
+			lines.push(
+				chrome.bottomLine ?? truncateToWidth(fallbackFooter, width, "", true),
+			);
 			return lines;
 		}
 

@@ -3,6 +3,7 @@ import { CustomEditor } from "@oh-my-pi/pi-coding-agent";
 import { TUI } from "@oh-my-pi/pi-tui";
 import { MouseEditModal } from "../src/mouse-edit-modal";
 import { MinimalTerminal } from "./support/minimal-terminal";
+import { formatSessionTranscript } from "../src/host/message-cache";
 describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 	it("enables alt screen and SGR mouse tracking in TUI overlay and disables on hide", () => {
 		const term = new MinimalTerminal();
@@ -554,6 +555,58 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		expect(lines.length).toBe(24);
 		// Row 0 in the top area must contain the real history line from row 0 of the snapshot!
 		expect(lines[0]?.includes("Committed history at top")).toBe(true);
+	});
+
+	it("renders native transcript components when branchEntries are provided", () => {
+		const term = new MinimalTerminal();
+		term.columns = 80;
+		term.rows = 24;
+		const tui = new TUI(term);
+
+		const branchEntries = [
+			{
+				type: "message",
+				message: {
+					role: "user",
+					content: "Hello native prompt",
+				},
+			},
+			{
+				type: "message",
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: "Native assistant reply here." }],
+					usage: {
+						input: 10,
+						output: 20,
+						cacheRead: 0,
+						cacheWrite: 0,
+						cost: { total: 0.001 },
+					},
+				},
+			},
+		];
+
+		const modal = new MouseEditModal(tui, "my draft", {
+			branchEntries,
+			layout: "mimic",
+			onSave: () => true,
+			onCancel: () => {},
+			copy: async () => {},
+			setInterval: () => 0,
+			clearTimer: () => {},
+		});
+
+		const lines = modal.render(80);
+		expect(lines.length).toBe(24);
+		expect(
+			lines.some(
+				l =>
+					l.includes("Hello native prompt") ||
+					l.includes("Native assistant reply"),
+			),
+		).toBe(true);
+		expect(lines.some(l => l.includes("[MOUSE 🖱️]"))).toBe(true);
 	});
 
 	it("soft-wraps long single-paragraph context replies and scrolls to the end", () => {

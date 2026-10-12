@@ -20,7 +20,8 @@ export default function activate(pi: ExtensionAPI): void {
 			}
 
 			const original = ctx.ui.getEditorText();
-			const sessionEntries = ctx.sessionManager?.getEntries?.() ?? [];
+			const sessionEntries =
+				ctx.sessionManager?.getBranch?.() ?? ctx.sessionManager?.getEntries?.() ?? [];
 			const transcriptContext =
 				formatSessionTranscript(sessionEntries) || messageCache.lastText;
 
@@ -28,6 +29,7 @@ export default function activate(pi: ExtensionAPI): void {
 				(tui, _theme, _keybindings, done) => {
 					const modal = new MouseEditModal(tui, original, {
 						contextReply: transcriptContext,
+						branchEntries: sessionEntries,
 						onSave: (newText: string) => {
 							const current = ctx.ui.getEditorText();
 							if (current !== original) {
