@@ -28,7 +28,7 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		expect(editor.capturesInput("\x1b[<0;10;5M")).toBe(false);
 		// Render to inspect top border
 		const lines = editor.render(80);
-		expect(lines[0]?.includes("[MOUSE 🖱️]")).toBe(true);
+		expect(lines[0]?.includes("🖱")).toBe(true);
 
 		// Esc disables mouse mode
 		editor.handleInput("\x1b");
@@ -117,13 +117,13 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		// Activate mouse mode
 		editor.setMouseActive(true);
 		lines = editor.render(80);
-		expect(lines[0]?.includes("[MOUSE 🖱️]")).toBe(true);
+		expect(lines[0]?.includes("🖱")).toBe(true);
 		expect(lines[0]?.includes("Outerwall")).toBe(true);
 
 		// Exit mouse mode
 		editor.setMouseActive(false);
 		lines = editor.render(80);
-		expect(lines[0]?.includes("[MOUSE 🖱️]")).toBe(false);
+		expect(lines[0]?.includes("🖱")).toBe(false);
 		expect(lines[0]?.includes("Outerwall")).toBe(true);
 	});
 
@@ -153,5 +153,60 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		// 4. Click on '词四' (screen col 19 -> text col 16)
 		editor.handleInput("\x1b[<0;20;24M");
 		expect(editor.getCursor().col).toBe(10);
+	});
+
+	it("supports text and hidden indicator display modes", () => {
+		const term = new MinimalTerminal();
+		const tui = new TUI(term);
+
+		// Text mode
+		const textEditor = new NativeMouseEditor(tui, getEditorTheme(), undefined, {
+			indicatorDisplay: "text",
+		});
+		textEditor.setTopBorderProvider(availableWidth => ({
+			content: " π > 🖥 Outerwall ",
+			width: 20,
+		}));
+		textEditor.setMouseActive(true);
+		let lines = textEditor.render(80);
+		expect(lines[0]?.includes("[MOUSE]")).toBe(true);
+
+		// Hidden mode
+		const hiddenEditor = new NativeMouseEditor(tui, getEditorTheme(), undefined, {
+			indicatorDisplay: "hidden",
+		});
+		hiddenEditor.setTopBorderProvider(availableWidth => ({
+			content: " π > 🖥 Outerwall ",
+			width: 20,
+		}));
+		hiddenEditor.setMouseActive(true);
+		lines = hiddenEditor.render(80);
+		expect(lines[0]?.includes("[MOUSE]")).toBe(false);
+		expect(lines[0]?.includes("🖱")).toBe(false);
+		expect(hiddenEditor.capturesInput("\x1b[<0;10;24M")).toBe(true);
+	});
+
+	it("automatically disables mouse editing and relinquishes capture when Vim mode is active", () => {
+		const term = new MinimalTerminal();
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+
+		// Simulate vimEnabled as true
+		Object.defineProperty(editor, "vimEnabled", {
+			get: () => true,
+			configurable: true,
+		});
+
+		expect(editor.vimEnabled).toBe(true);
+		expect(editor.isMouseEnabled).toBe(false);
+
+		// Alt+E toggle is rejected when vim mode is active
+		const toggled = editor.toggleMouseMode();
+		expect(toggled).toBe(false);
+		expect(editor.mouseActive).toBe(false);
+		expect(editor.isMouseEnabled).toBe(false);
+
+		// capturesInput must return false so Vim gets 100% priority
+		expect(editor.capturesInput("\x1b[<0;10;24M")).toBe(false);
 	});
 });

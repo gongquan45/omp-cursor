@@ -21,6 +21,12 @@ import {
 	getWordRangeAt,
 } from "../core/edit-buffer";
 import { hostTextServices } from "../host/text-services";
+export type IndicatorDisplayMode = "icon" | "text" | "hidden";
+
+export interface NativeMouseEditorOptions {
+	indicatorDisplay?: IndicatorDisplayMode;
+}
+
 /**
  * Maps visual cell column offset within a logical line to a UTF-16 character offset.
  * Accurately steps through Unicode grapheme clusters taking visibleWidth (e.g. 2 for CJK/Emoji)
@@ -56,26 +62,37 @@ export class NativeMouseEditor extends CustomEditor {
 	#lastClickOffset = -1;
 	#clickCount = 0;
 	#upstreamTopBorderProvider?: ((availableWidth: number) => EditorTopBorder | undefined) | undefined = undefined;
+	#indicatorDisplay: IndicatorDisplayMode = "icon";
 
 	constructor(
 		tui: TUI,
 		theme: EditorTheme,
 		_keybindings?: KeybindingsManager,
+		options?: NativeMouseEditorOptions,
 	) {
 		super(theme);
 		this.#tui = tui;
+		this.#indicatorDisplay = options?.indicatorDisplay ?? "icon";
 		this.#editBuffer = new EditBuffer("", { services: hostTextServices });
 		// Wrap setTopBorderProvider so [MOUSE 🖱️] dynamically prepends to the host StatusLine
 		super.setTopBorderProvider((availableWidth: number) => {
-			if (!this.#mouseActive) {
+			if (!this.isMouseEnabled || this.#indicatorDisplay === "hidden") {
 				return this.#upstreamTopBorderProvider?.(availableWidth);
 			}
 
-			const badge = " \x1b[1;36m[MOUSE 🖱️]\x1b[0m ";
+			const badge =
+				this.#indicatorDisplay === "text"
+					? " \x1b[1;36m[MOUSE]\x1b[0m "
+					: " \x1b[1;36m🖱\x1b[0m ";
 			const badgeWidth = visibleWidth(badge);
-			const innerWidth = Math.max(0, availableWidth - badgeWidth);
-			const base = this.#upstreamTopBorderProvider?.(innerWidth);
+			const innerWidth = availableWidth - badgeWidth;
 
+			// Narrow terminal safeguard: don't crowd status line if width is tight
+			if (innerWidth < 10) {
+				return this.#upstreamTopBorderProvider?.(availableWidth);
+			}
+
+			const base = this.#upstreamTopBorderProvider?.(innerWidth);
 			if (!base) {
 				return { content: badge, width: badgeWidth };
 			}
@@ -89,7 +106,7 @@ export class NativeMouseEditor extends CustomEditor {
 
 		// Register selection decoration hook on CustomEditor
 		this.decorateText = (rowText: string, ctx: EditorTextDecorationContext): string => {
-			if (!this.#selection) return rowText;
+			if (!this.isMouseEnabled || !this.#selection) return rowText;
 			const lines = this.getLines();
 			let lineOffset = 0;
 			for (let i = 0; i < ctx.line; i++) {
@@ -115,6 +132,13 @@ export class NativeMouseEditor extends CustomEditor {
 		};
 	}
 
+	get isMouseEnabled(): boolean {
+		if (this.vimEnabled) {
+			return false;
+		}
+		return this.#mouseActive;
+	}
+
 	get mouseActive(): boolean {
 		return this.#mouseActive;
 	}
@@ -131,8 +155,22 @@ export class NativeMouseEditor extends CustomEditor {
 		this.#tui.requestRender();
 	}
 
-	toggleMouseMode(): void {
+	toggleMouseMode(): boolean {
+		if (this.vimEnabled) {
+			return false;
+		}
 		this.setMouseActive(!this.#mouseActive);
+		return this.#mouseActive;
+	}
+
+	get indicatorDisplay(): IndicatorDisplayMode {
+		return this.#indicatorDisplay;
+	}
+
+	setIndicatorDisplay(mode: IndicatorDisplayMode): void {
+		if (this.#indicatorDisplay === mode) return;
+		this.#indicatorDisplay = mode;
+		this.#tui.requestRender();
 	}
 
 	override setTopBorderProvider(
@@ -146,7 +184,7 @@ export class NativeMouseEditor extends CustomEditor {
 	 * Reserving SGR mouse events when mouseActive is true ensures mouse clicks route to this editor.
 	 */
 	override capturesInput(data: string): boolean {
-		if (this.#mouseActive && data.startsWith("\x1b[<")) {
+		if (this.isMouseEnabled && data.startsWith("\x1b[<")) {
 			const event = parseSgrMouse(data);
 			if (event) {
 				return this.#isRowInsideEditor(event.row);
@@ -282,7 +320,7 @@ export class NativeMouseEditor extends CustomEditor {
 			return;
 		}
 
-		if (this.#mouseActive) {
+		if (this.isMouseEnabled) {
 			// Esc or Ctrl+Q exits mouse mode
 			if (matchesKey(data, "escape") || matchesKey(data, "ctrl+q")) {
 				this.setMouseActive(false);
