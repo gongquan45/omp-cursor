@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { getEditorTheme, TUI } from "@oh-my-pi/pi-tui";
-import { NativeMouseEditor } from "../src/components/native-mouse-editor";
+import {
+	NativeMouseEditor,
+	injectBadgeIntoStatusLine,
+} from "../src/components/native-mouse-editor";
 import { MinimalTerminal } from "./support/minimal-terminal";
 
 describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
@@ -117,9 +120,7 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		// Activate mouse mode
 		editor.setMouseActive(true);
 		lines = editor.render(80);
-		expect(lines[0]?.includes("🖱")).toBe(true);
-		expect(lines[0]?.includes("Outerwall")).toBe(true);
-
+		expect(Bun.stripANSI(lines[0] ?? "").includes("π > 🖱 > 🖥 Outerwall")).toBe(true);
 		// Exit mouse mode
 		editor.setMouseActive(false);
 		lines = editor.render(80);
@@ -169,8 +170,7 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		}));
 		textEditor.setMouseActive(true);
 		let lines = textEditor.render(80);
-		expect(lines[0]?.includes("[MOUSE]")).toBe(true);
-
+		expect(Bun.stripANSI(lines[0] ?? "").includes("π > [MOUSE] > 🖥 Outerwall")).toBe(true);
 		// Hidden mode
 		const hiddenEditor = new NativeMouseEditor(tui, getEditorTheme(), undefined, {
 			indicatorDisplay: "hidden",
@@ -239,5 +239,25 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		const cursorBefore = editor.getCursor();
 		editor.handleInput("\x1b[<0;5;23M");
 		expect(editor.getCursor()).toEqual(cursorBefore);
+	});
+
+	it("verifies injectBadgeIntoStatusLine inserts into the exact Vim status slot after π >", () => {
+		const standard = " π > 🖥 Outerwall > ◒ Gemini 3.8 Flash ";
+		const resIcon = injectBadgeIntoStatusLine(standard, "🖱");
+		expect(resIcon.content).toBe(" π > 🖱 > 🖥 Outerwall > ◒ Gemini 3.8 Flash ");
+
+		const resText = injectBadgeIntoStatusLine(standard, "[MOUSE]");
+		expect(resText.content).toBe(" π > [MOUSE] > 🖥 Outerwall > ◒ Gemini 3.8 Flash ");
+
+		// Powerline thin separator
+		const powerline = " π › 🖥 Outerwall › ◒ Gemini 3.8 Flash ";
+		const resPowerline = injectBadgeIntoStatusLine(powerline, "🖱");
+		expect(resPowerline.content).toBe(" π › 🖱 › 🖥 Outerwall › ◒ Gemini 3.8 Flash ");
+
+		// If no separator found, do not prepend to front (safe fallback)
+		const noSep = " SimpleStatusTitle ";
+		const resNoSep = injectBadgeIntoStatusLine(noSep, "🖱");
+		expect(resNoSep.content).toBe(" SimpleStatusTitle ");
+		expect(resNoSep.widthDiff).toBe(0);
 	});
 });

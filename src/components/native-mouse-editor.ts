@@ -50,6 +50,38 @@ export function visualColToCharOffset(
 	}
 	return lineText.length;
 }
+/**
+ * Injects the mouse mode badge into the exact slot where OMP displays Vim status:
+ * directly after the leading brand segment ("π") and separator, preceding the hostname.
+ * e.g. " π > 🖥 Outerwall " -> " π > 🖱 > 🖥 Outerwall "
+ */
+export function injectBadgeIntoStatusLine(
+	content: string,
+	badgeStr: string,
+): { content: string; widthDiff: number } {
+	if (!badgeStr) return { content, widthDiff: 0 };
+
+	const piIndex = content.indexOf("π");
+	const searchStart = piIndex !== -1 ? piIndex + 1 : 0;
+	const sub = content.slice(searchStart);
+
+	const sepRegex =
+		/((?:\x1b\[[0-9;]*m)*\s*[>›\u203a\ue0b0\ue0b1]\s*(?:\x1b\[[0-9;]*m)*\s*)/;
+	const match = sub.match(sepRegex);
+
+	if (match && match.index !== undefined) {
+		const sep = match[0];
+		const insertIdx = searchStart + match.index + sep.length;
+		const before = content.slice(0, insertIdx);
+		const after = content.slice(insertIdx);
+		const injected = `${before}${badgeStr}${sep}${after}`;
+		const widthDiff = visibleWidth(injected) - visibleWidth(content);
+		return { content: injected, widthDiff };
+	}
+
+	return { content, widthDiff: 0 };
+}
+
 
 
 export class NativeMouseEditor extends CustomEditor {
@@ -82,9 +114,9 @@ export class NativeMouseEditor extends CustomEditor {
 
 			const badge =
 				this.#indicatorDisplay === "text"
-					? " \x1b[1;36m[MOUSE]\x1b[0m "
-					: " \x1b[1;36m🖱\x1b[0m ";
-			const badgeWidth = visibleWidth(badge);
+					? "\x1b[1;36m[MOUSE]\x1b[0m"
+					: "\x1b[1;36m🖱\x1b[0m";
+			const badgeWidth = visibleWidth(badge) + 3;
 			const innerWidth = availableWidth - badgeWidth;
 
 			// Narrow terminal safeguard: don't crowd status line if width is tight
@@ -94,12 +126,18 @@ export class NativeMouseEditor extends CustomEditor {
 
 			const base = this.#upstreamTopBorderProvider?.(innerWidth);
 			if (!base) {
-				return { content: badge, width: badgeWidth };
+				const fallback = ` ${badge} `;
+				return { content: fallback, width: visibleWidth(fallback) };
 			}
 
+			const { content: injectedContent, widthDiff } = injectBadgeIntoStatusLine(
+				base.content,
+				badge,
+			);
+
 			return {
-				content: badge + base.content,
-				width: badgeWidth + base.width,
+				content: injectedContent,
+				width: base.width + widthDiff,
 			};
 		});
 
