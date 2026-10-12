@@ -1,6 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { copyToClipboard } from "@oh-my-pi/pi-coding-agent/utils/clipboard";
 import { MouseEditModal } from "./mouse-edit-modal";
+import { NativeMouseEditor } from "./components/native-mouse-editor";
 import { AssistantMessageCache, formatSessionTranscript } from "./host/message-cache";
 
 export interface ModalResult {
@@ -12,9 +13,30 @@ export default function activate(pi: ExtensionAPI): void {
 	const messageCache = new AssistantMessageCache();
 	messageCache.bind(pi);
 
+	let activeNativeEditor: NativeMouseEditor | null = null;
+
+	if (typeof pi?.on === "function") {
+		pi.on("session_start", async (_event, ctx) => {
+			if (!ctx.hasUI || !ctx.ui || typeof ctx.ui.setEditorComponent !== "function") {
+				return;
+			}
+
+			ctx.ui.setEditorComponent((tui, theme, keybindings) => {
+				const editor = new NativeMouseEditor(tui, theme, keybindings);
+				activeNativeEditor = editor;
+				tui.setInlineMouseTrackingProvider(() => editor.mouseActive);
+				return editor;
+			});
+		});
+	}
+
 	pi.registerShortcut("alt+e", {
-		description: "Open mouse-driven full-screen editor overlay for current draft",
+		description: "Toggle mouse editing mode in the native prompt editor",
 		handler: async (ctx: ExtensionContext) => {
+			if (activeNativeEditor) {
+				activeNativeEditor.toggleMouseMode();
+				return;
+			}
 			if (!ctx.hasUI || !ctx.ui || typeof ctx.ui.custom !== "function") {
 				return;
 			}
