@@ -66,7 +66,7 @@ export function injectBadgeIntoStatusLine(
 	const sub = content.slice(searchStart);
 
 	const sepRegex =
-		/((?:\x1b\[[0-9;]*m)*\s*[>›\u203a\ue0b0\ue0b1]\s*(?:\x1b\[[0-9;]*m)*\s*)/;
+		/((?:\x1b\[[0-9;]*m)*\s*[>›\u203a\u2039\u25b6\u25c0\u2595\u2506\ue0b0\ue0b1\ue0b2\ue0b3\ue0b6\ue0b7\|\/]\s*(?:\x1b\[[0-9;]*m)*\s*)/;
 	const match = sub.match(sepRegex);
 
 	if (match && match.index !== undefined) {
@@ -74,7 +74,8 @@ export function injectBadgeIntoStatusLine(
 		const insertIdx = searchStart + match.index + sep.length;
 		const before = content.slice(0, insertIdx);
 		const after = content.slice(insertIdx);
-		const injected = `${before}${badgeStr}${sep}${after}`;
+		const nextSep = sep.startsWith(" ") ? sep : ` ${sep}`;
+		const injected = `${before}${badgeStr}${nextSep}${after}`;
 		const widthDiff = visibleWidth(injected) - visibleWidth(content);
 		return { content: injected, widthDiff };
 	}

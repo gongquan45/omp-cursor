@@ -254,6 +254,11 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		const resPowerline = injectBadgeIntoStatusLine(powerline, "🖱");
 		expect(resPowerline.content).toBe(" π › 🖱 › 🖥 Outerwall › ◒ Gemini 3.8 Flash ");
 
+
+		// Unicode powerline separator (preset: full with symbolPreset: unicode)
+		const unicodeSep = " π ▶ 🖥 Outerwall ▶ ◒ Gemini 3.8 Flash ";
+		const resUnicode = injectBadgeIntoStatusLine(unicodeSep, "🖱");
+		expect(resUnicode.content).toBe(" π ▶ 🖱 ▶ 🖥 Outerwall ▶ ◒ Gemini 3.8 Flash ");
 		// If no separator found, do not prepend to front (safe fallback)
 		const noSep = " SimpleStatusTitle ";
 		const resNoSep = injectBadgeIntoStatusLine(noSep, "🖱");
