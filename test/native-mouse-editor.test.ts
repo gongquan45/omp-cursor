@@ -286,7 +286,7 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		expect(editor.getText()).toBe("original draft");
 	});
 
-	it("auto-saves edits and exits mouse mode when Esc or Ctrl+Q is pressed", () => {
+	it("auto-saves edits and exits mouse mode when Esc is pressed", () => {
 		const term = new MinimalTerminal();
 		const tui = new TUI(term);
 		const editor = new NativeMouseEditor(tui, getEditorTheme());
@@ -299,6 +299,18 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		editor.handleInput("\x1b");
 		expect(editor.mouseActive).toBe(false);
 		expect(editor.getText()).toBe("original draft saved edits");
+	});
+
+	it("does not treat Ctrl+Q as a save chord in mouse mode", () => {
+		const term = new MinimalTerminal();
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+		editor.setText("draft");
+
+		editor.setMouseActive(true);
+		// Pressing Ctrl+Q should NOT exit mouse mode
+		editor.handleInput("\x11");
+		expect(editor.mouseActive).toBe(true);
 	});
 
 	it("preserves status line background color by avoiding \\x1b[0m resets in badge", () => {

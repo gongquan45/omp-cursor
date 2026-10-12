@@ -119,8 +119,8 @@ describe("Extension Entrypoint (src/index.ts)", () => {
 				component.render(80);
 				// Add text
 				component.buffer.replaceSelection(" added");
-				// Press Ctrl+Q to save
-				component.handleInput("\x11");
+				// Press Esc to auto-save
+				component.handleInput("\x1b");
 
 				const result = await promise;
 				modalResult = result as ModalResult;
@@ -275,8 +275,8 @@ describe("Extension Entrypoint (src/index.ts)", () => {
 				// Background change happens!
 				editorText = "background drift occurred";
 
-				// User tries to save
-				component.handleInput("\x11");
+				// User tries to save with Esc
+				component.handleInput("\x1b");
 
 				// User cancels with Ctrl+D after seeing error
 				component.handleInput("\x04");

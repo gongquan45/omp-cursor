@@ -374,12 +374,11 @@ export class NativeMouseEditor extends CustomEditor {
 		}
 
 		if (this.isMouseEnabled) {
-			// Esc or Ctrl+Q: Auto-save and exit mouse mode
-			if (matchesKey(data, "escape") || matchesKey(data, "ctrl+q")) {
+			// Esc: Auto-save and exit mouse mode
+			if (matchesKey(data, "escape")) {
 				this.setMouseActive(false);
 				return;
 			}
-
 			// Ctrl+D: Discard edits and restore snapshot
 			if (matchesKey(data, "ctrl+d")) {
 				if (this.#draftSnapshotOnEnter !== null) {

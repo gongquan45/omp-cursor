@@ -639,9 +639,11 @@ export class MouseEditModal implements Component, Focusable {
 			}
 		}
 
-		// Minimum dimension guard: only Esc is processed
+		// Minimum dimension guard: Esc or Alt+E saves, Ctrl+D discards
 		if (this.#lastRenderWidth < 6 || this.#lastRenderHeight < 3) {
-			if (matchesKey(data, "escape")) {
+			if (matchesKey(data, "escape") || matchesKey(data, "alt+e")) {
+				this.#save();
+			} else if (matchesKey(data, "ctrl+d")) {
 				this.#cancel();
 			}
 			return;
@@ -659,12 +661,8 @@ export class MouseEditModal implements Component, Focusable {
 			return;
 		}
 
-		// Save Chords: Ctrl+Enter, Ctrl+Q, or Escape (Auto-save)
-		if (
-			matchesKey(data, "ctrl+enter") ||
-			matchesKey(data, "ctrl+q") ||
-			matchesKey(data, "escape")
-		) {
+		// Save Chords: Alt+E or Escape (Auto-save)
+		if (matchesKey(data, "alt+e") || matchesKey(data, "escape")) {
 			this.#save();
 			return;
 		}
@@ -929,7 +927,7 @@ export class MouseEditModal implements Component, Focusable {
 			// Bottom Mimic Editor Box via native ComposerStyle
 			const badge = this.#errorMessage
 				? ` [错误] ${this.#errorMessage} `
-				: " 鼠标编辑 (Alt+E) ── \x1b[1;36m[MOUSE 🖱️]\x1b[0m ── Ctrl+Q 保存 · Esc 放弃 ";
+				: " 鼠标编辑 (Alt+E) ── \x1b[1;36m[MOUSE 🖱️]\x1b[0m ── Esc 保存 · Ctrl+D 放弃 ";
 			const chrome = buildNativeComposerChrome({
 				width,
 				badgeText: badge,
@@ -984,7 +982,7 @@ export class MouseEditModal implements Component, Focusable {
 
 			const fallbackFooter = this.#errorMessage
 				? ` ╰── [错误] ${this.#errorMessage} (按 Ctrl+D 退出) ──────────────╯`
-				: " ╰── Ctrl+Q / Esc 保存 ─ Ctrl+D 放弃 ──────────────────────────────╯";
+				: " ╰── Alt+E / Esc 保存 ─ Ctrl+D 放弃 ──────────────────────────────╯";
 			lines.push(
 				chrome.bottomLine ?? truncateToWidth(fallbackFooter, width, "", true),
 			);
@@ -1044,7 +1042,7 @@ export class MouseEditModal implements Component, Focusable {
 
 		const footer = this.#errorMessage
 			? ` [错误] ${this.#errorMessage} (按 Ctrl+D 退出)`
-			: " Alt+E 打开 | Ctrl+Q/Esc 保存 | Ctrl+D 放弃 | 鼠标无响应时请检查终端 SGR 鼠标支持";
+			: " Alt+E/Esc 保存 | Ctrl+D 放弃 | 鼠标无响应时请检查终端 SGR 鼠标支持";
 		lines.push(truncateToWidth(footer, width, "", true));
 
 		return lines;

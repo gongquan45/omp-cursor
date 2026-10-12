@@ -88,8 +88,8 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		modal.handleInput("\x7f");
 		expect(modal.buffer.text).toBe("alpha 🙂 tail");
 
-		// 5. Ctrl+Q to save
-		modal.handleInput("\x11");
+		// 5. Esc to save
+		modal.handleInput("\x1b");
 		expect(savedResult).toEqual("alpha 🙂 tail");
 	});
 
@@ -282,8 +282,8 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		modal.handleInput("A");
 		expect(modal.buffer.text).toBe("sample");
 
-		// Esc still works to exit
-		modal.handleInput("\x1b");
+		// Ctrl+D still works to discard and exit
+		modal.handleInput("\x04");
 		expect(cancelled).toBe(true);
 	});
 
@@ -353,8 +353,8 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		modal.buffer.select(0, 6);
 		modal.buffer.replaceSelection("new-prefix");
 
-		// Save via Ctrl+Q
-		modal.handleInput("\x11");
+		// Save via Esc
+		modal.handleInput("\x1b");
 		expect(savedOk).toBe(true);
 
 		// Verify that CustomEditor now has updated text AND still expands the atom
@@ -391,8 +391,8 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		// Meanwhile, background editor changed:
 		editor.setText("background changed draft");
 
-		// User tries to save
-		modal.handleInput("\x11");
+		// User tries to save via Esc
+		modal.handleInput("\x1b");
 
 		// Save was rejected
 		expect(editor.getText()).toBe("background changed draft");
