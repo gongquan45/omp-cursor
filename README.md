@@ -79,7 +79,7 @@ OMP automatically loads extensions located in `~/.omp/agent/extensions/`:
 
 ```bash
 # 1. Clone into OMP extensions directory
-git clone https://github.com/<your-username>/omp-cursor.git ~/.omp/agent/extensions/omp-cursor
+git clone https://github.com/gongquan45/omp-cursor.git ~/.omp/agent/extensions/omp-cursor
 
 # 2. Install dependencies
 cd ~/.omp/agent/extensions/omp-cursor

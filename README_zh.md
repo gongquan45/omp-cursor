@@ -79,7 +79,7 @@ OMP 启动时会自动扫描 `~/.omp/agent/extensions/` 下的插件：
 
 ```bash
 # 1. 克隆到 OMP 插件目录
-git clone https://github.com/<your-username>/omp-cursor.git ~/.omp/agent/extensions/omp-cursor
+git clone https://github.com/gongquan45/omp-cursor.git ~/.omp/agent/extensions/omp-cursor
 
 # 2. 安装依赖
 cd ~/.omp/agent/extensions/omp-cursor

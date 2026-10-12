@@ -14,6 +14,14 @@
   ],
   "private": false,
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gongquan45/omp-cursor.git"
+  },
+  "homepage": "https://github.com/gongquan45/omp-cursor#readme",
+  "bugs": {
+    "url": "https://github.com/gongquan45/omp-cursor/issues"
+  },
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit"
