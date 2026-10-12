@@ -473,8 +473,9 @@ describe("MouseEditModal - Component and Fullscreen Overlay", () => {
 		expect(lines.some(l => l.includes("上一次回复"))).toBe(true);
 		expect(lines.some(l => l.includes("Here is the previous agent answer."))).toBe(true);
 
-		// Bottom mimic box is rendered
+		// Bottom mimic box is rendered with Vim-style [MOUSE 🖱️] mode badge
 		expect(lines.some(l => l.includes("鼠标编辑 (Alt+E)"))).toBe(true);
+		expect(lines.some(l => l.includes("[MOUSE 🖱️]"))).toBe(true);
 		expect(lines.some(l => l.includes("draft line 1"))).toBe(true);
 
 		// Test wheel over top area scrolls top context

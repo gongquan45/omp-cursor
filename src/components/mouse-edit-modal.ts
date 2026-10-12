@@ -877,30 +877,28 @@ export class MouseEditModal implements Component, Focusable {
 
 			// Top Context Area: Render previous reply card if available, else snapshot or blank
 			if (this.#contextReply) {
-				lines.push(
-					truncateToWidth(
-						" ╭── 上一次回复 (Agent Reply) ───────────────────────────────────╮",
-						width,
-						"",
-						true,
-					),
-				);
 				const replyInnerWidth = Math.max(1, width - 6);
 				const replyLines = wrapTextWithAnsi(this.#contextReply, replyInnerWidth);
 				const maxReplyRows = Math.max(1, boxStartRow - 2);
+				const maxTopScroll = Math.max(0, replyLines.length - maxReplyRows);
+
+				const topHeader =
+					this.#topScrollOffset > 0
+						? " ╭── 上下文历史 (Agent Reply · ↑ 已向上滚) ─────────────────────────────────╮"
+						: " ╭── 上一次回复 (Agent Reply) ───────────────────────────────────╮";
+				lines.push(truncateToWidth(topHeader, width, "", true));
+
 				for (let r = 0; r < maxReplyRows; r++) {
 					const idx = this.#topScrollOffset + r;
 					const content = idx < replyLines.length ? ` │ ${replyLines[idx]}` : " │";
 					lines.push(truncateToWidth(content, width - 2, "", true) + " │");
 				}
-				lines.push(
-					truncateToWidth(
-						" ╰───────────────────────────────────────────────────────────────╯",
-						width,
-						"",
-						true,
-					),
-				);
+
+				const topFooter =
+					this.#topScrollOffset < maxTopScroll
+						? " ╰── (↓ 滚轮向下可看更新内容) ─────────────────────────────────────╯"
+						: " ╰───────────────────────────────────────────────────────────────╯";
+				lines.push(truncateToWidth(topFooter, width, "", true));
 			} else {
 				const snapTop = this.#normalSnapshot?.screenTop ?? 0;
 				for (let r = 0; r < boxStartRow; r++) {
@@ -917,7 +915,7 @@ export class MouseEditModal implements Component, Focusable {
 
 			// Bottom Mimic Editor Box
 			let title =
-				" ╭── 鼠标编辑 (Alt+E) ── Ctrl+Q 保存 · Esc 取消 ──────────────────────────╮";
+				" ╭── 鼠标编辑 (Alt+E) ── \x1b[1;36m[MOUSE 🖱️]\x1b[0m ── Ctrl+Q 保存 · Esc 放弃 ──────────────────╮";
 			if (this.#errorMessage) {
 				title = ` ╭── [错误] ${this.#errorMessage} ─────────────────────────────╮`;
 			}
