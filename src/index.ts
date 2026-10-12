@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from "@oh-my-pi/pi-coding-agent";
 import { copyToClipboard } from "@oh-my-pi/pi-coding-agent/utils/clipboard";
 import { MouseEditModal } from "./mouse-edit-modal";
-import { AssistantMessageCache } from "./host/message-cache";
+import { AssistantMessageCache, formatSessionTranscript } from "./host/message-cache";
 
 export interface ModalResult {
 	saved: boolean;
@@ -20,11 +20,14 @@ export default function activate(pi: ExtensionAPI): void {
 			}
 
 			const original = ctx.ui.getEditorText();
+			const sessionEntries = ctx.sessionManager?.getEntries?.() ?? [];
+			const transcriptContext =
+				formatSessionTranscript(sessionEntries) || messageCache.lastText;
 
 			await ctx.ui.custom<ModalResult | undefined>(
 				(tui, _theme, _keybindings, done) => {
 					const modal = new MouseEditModal(tui, original, {
-						contextReply: messageCache.lastText,
+						contextReply: transcriptContext,
 						onSave: (newText: string) => {
 							const current = ctx.ui.getEditorText();
 							if (current !== original) {

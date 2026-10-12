@@ -3,6 +3,7 @@ import type { ExtensionAPI } from "@oh-my-pi/pi-coding-agent";
 import {
 	AssistantMessageCache,
 	extractAssistantText,
+	formatSessionTranscript,
 } from "../src/host/message-cache";
 
 describe("AssistantMessageCache", () => {
@@ -105,5 +106,51 @@ describe("AssistantMessageCache", () => {
 		// Trigger session_switch -> cache cleared
 		handlers["session_switch"]![0]!({});
 		expect(cache.lastText).toBeNull();
+	});
+
+	it("formats multi-turn session entries into structured chronological conversation", () => {
+		const sessionEntries = [
+			{ type: "session", id: "s1" },
+			{
+				type: "message",
+				message: {
+					role: "user",
+					content: "Hello, can you help me?",
+				},
+			},
+			{
+				type: "message",
+				message: {
+					role: "assistant",
+					content: [
+						{ type: "thinking", thinking: "Internal thought" },
+						{ type: "text", text: "Sure, what do you need?" },
+					],
+				},
+			},
+			{
+				type: "message",
+				message: {
+					role: "user",
+					content: [{ type: "text", text: "Write a poem" }],
+				},
+			},
+			{
+				type: "message",
+				message: {
+					role: "assistant",
+					content: [{ type: "text", text: "Roses are red, violets are blue." }],
+				},
+			},
+		];
+
+		const transcript = formatSessionTranscript(sessionEntries);
+		expect(transcript).not.toBeNull();
+		expect(transcript?.includes("[You]: Hello, can you help me?")).toBe(true);
+		expect(transcript?.includes("[Assistant]: Sure, what do you need?")).toBe(true);
+		expect(transcript?.includes("[You]: Write a poem")).toBe(true);
+		expect(
+			transcript?.includes("[Assistant]: Roses are red, violets are blue."),
+		).toBe(true);
 	});
 });

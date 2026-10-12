@@ -299,4 +299,85 @@ describe("Extension Entrypoint (src/index.ts)", () => {
 		expect(editorText).toBe("background drift occurred");
 		expect(modalInstance?.errorMessage).toBe("草稿在后台发生变化，未覆盖；按 Esc 退出");
 	});
+
+	it("extracts sessionManager entries and supplies formatted multi-turn context to modal", async () => {
+		let registeredHandler: ((ctx: ExtensionContext) => Promise<void> | void) | null = null;
+		const stubApi = {
+			registerShortcut: (
+				_shortcut: string,
+				options: { handler: (ctx: ExtensionContext) => Promise<void> | void },
+			) => {
+				registeredHandler = options.handler;
+			},
+		} as unknown as ExtensionAPI;
+
+		activate(stubApi);
+
+		const term = new MinimalTerminal();
+		const tui = new PiTui(term);
+		let modalRenderedLines: readonly string[] = [];
+
+		const stubUi = {
+			getEditorText: () => "draft",
+			setEditorText: () => {},
+			custom: async <T>(
+				factory: (
+					tui: TUI,
+					theme: Theme,
+					keybindings: KeybindingsManager,
+					done: (result: T) => void,
+				) => Component | Promise<Component>,
+			): Promise<T> => {
+				const { promise, resolve } = Promise.withResolvers<T>();
+				const component = (await factory(
+					tui as unknown as TUI,
+					{} as Theme,
+					{} as KeybindingsManager,
+					res => {
+						resolve(res);
+					},
+				)) as MouseEditModal;
+
+				modalRenderedLines = component.render(80);
+				component.handleInput("\x1b");
+				return await promise;
+			},
+		} as unknown as ExtensionUIContext;
+
+		const stubSessionManager = {
+			getEntries: () => [
+				{
+					type: "message",
+					message: { role: "user", content: "How do I optimize code?" },
+				},
+				{
+					type: "message",
+					message: {
+						role: "assistant",
+						content: [{ type: "text", text: "Profile before optimizing." }],
+					},
+				},
+			],
+		};
+
+		const stubContext = {
+			hasUI: true,
+			ui: stubUi,
+			sessionManager: stubSessionManager,
+			setInterval: () => 0,
+			clearTimer: () => {},
+		} as unknown as ExtensionContext;
+
+		await registeredHandler!(stubContext);
+
+		// Verify the rendered modal contains the multi-turn session context!
+		expect(
+			modalRenderedLines.some(l => l.includes("[You]: How do I optimize code?")),
+		).toBe(true);
+		expect(
+			modalRenderedLines.some(l =>
+				l.includes("[Assistant]: Profile before optimizing."),
+			),
+		).toBe(true);
+	});
 });

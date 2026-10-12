@@ -82,3 +82,65 @@ export class AssistantMessageCache {
 		pi.on("session_branch", reset);
 	}
 }
+
+export interface ChatTurn {
+	role: "user" | "assistant";
+	text: string;
+}
+
+/**
+ * Extracts and formats a multi-turn conversation transcript from session entries.
+ * Extracts user prompts and assistant text responses, preserving chronological flow.
+ */
+export function formatSessionTranscript(entries: unknown[]): string | null {
+	if (!Array.isArray(entries) || entries.length === 0) return null;
+
+	const turns: ChatTurn[] = [];
+	for (const entry of entries) {
+		if (!entry || typeof entry !== "object") continue;
+		const e = entry as { type?: string; message?: unknown };
+		if (e.type !== "message" || !e.message || typeof e.message !== "object") continue;
+
+		const msg = e.message as { role?: string; content?: unknown };
+		if (msg.role === "user") {
+			let text = "";
+			if (typeof msg.content === "string") {
+				text = msg.content;
+			} else if (Array.isArray(msg.content)) {
+				for (const item of msg.content) {
+					if (
+						item &&
+						typeof item === "object" &&
+						"text" in item &&
+						typeof item.text === "string"
+					) {
+						text += item.text;
+					}
+				}
+			}
+			const trimmed = text.trim();
+			if (trimmed.length > 0) {
+				turns.push({ role: "user", text: trimmed });
+			}
+		} else if (msg.role === "assistant") {
+			const text = extractAssistantText(msg);
+			if (text !== null) {
+				turns.push({ role: "assistant", text });
+			}
+		}
+	}
+
+	if (turns.length === 0) return null;
+
+	const formattedLines: string[] = [];
+	for (const turn of turns) {
+		if (turn.role === "user") {
+			formattedLines.push(`[You]: ${turn.text}`);
+		} else {
+			formattedLines.push(`[Assistant]: ${turn.text}`);
+		}
+		formattedLines.push("");
+	}
+
+	return formattedLines.join("\n").trim();
+}
