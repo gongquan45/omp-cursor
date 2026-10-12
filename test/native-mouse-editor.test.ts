@@ -96,4 +96,61 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		expect(editor.getText()).toBe("hello earth");
 		expect(editor.selection).toBeNull();
 	});
+
+	it("dynamically prepends [MOUSE 🖱️] to host StatusLine provider and restores on exit", () => {
+		const term = new MinimalTerminal();
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+
+		// Attach upstream statusLine provider
+		editor.setTopBorderProvider(availableWidth => ({
+			content: " π > 🖥 Outerwall > ◒ Gemini 3.8 Flash ",
+			width: 37,
+		}));
+
+		// Initially without mouseActive
+		let lines = editor.render(80);
+		expect(lines[0]?.includes("Outerwall")).toBe(true);
+		expect(lines[0]?.includes("[MOUSE 🖱️]")).toBe(false);
+
+		// Activate mouse mode
+		editor.setMouseActive(true);
+		lines = editor.render(80);
+		expect(lines[0]?.includes("[MOUSE 🖱️]")).toBe(true);
+		expect(lines[0]?.includes("Outerwall")).toBe(true);
+
+		// Exit mouse mode
+		editor.setMouseActive(false);
+		lines = editor.render(80);
+		expect(lines[0]?.includes("[MOUSE 🖱️]")).toBe(false);
+		expect(lines[0]?.includes("Outerwall")).toBe(true);
+	});
+
+	it("correctly maps CJK double-width character columns without 2x scaling error", () => {
+		const term = new MinimalTerminal();
+		term.columns = 80;
+		term.rows = 24;
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+		editor.setText("词一 词二 词三 词四");
+		editor.setMouseActive(true);
+		editor.render(80);
+
+		// 1. Click on '词一' (screen col 4 -> text col 1)
+		editor.handleInput("\x1b[<0;5;23M");
+		expect(editor.getCursor().col).toBe(1);
+
+		// 2. Click on '词二' (screen col 9 -> text col 6)
+		editor.handleInput("\x1b[<0;10;23M");
+		// Must land at '词二' (offset 4), NOT overshoot to '词四' (offset 7)!
+		expect(editor.getCursor().col).toBe(4);
+
+		// 3. Click on '词三' (screen col 14 -> text col 11)
+		editor.handleInput("\x1b[<0;15;23M");
+		expect(editor.getCursor().col).toBe(7);
+
+		// 4. Click on '词四' (screen col 19 -> text col 16)
+		editor.handleInput("\x1b[<0;20;23M");
+		expect(editor.getCursor().col).toBe(10);
+	});
 });

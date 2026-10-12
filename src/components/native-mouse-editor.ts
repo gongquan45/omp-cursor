@@ -4,10 +4,12 @@ import type { KeybindingsManager } from "@oh-my-pi/pi-coding-agent";
 import type {
 	EditorTextDecorationContext,
 	EditorTheme,
+	EditorTopBorder,
 	TUI,
 } from "@oh-my-pi/pi-tui";
 import {
 	extractPrintableText,
+	getSegmenter,
 	matchesKey,
 	parseSgrMouse,
 	type SgrMouseEvent,
@@ -19,6 +21,30 @@ import {
 	getWordRangeAt,
 } from "../core/edit-buffer";
 import { hostTextServices } from "../host/text-services";
+/**
+ * Maps visual cell column offset within a logical line to a UTF-16 character offset.
+ * Accurately steps through Unicode grapheme clusters taking visibleWidth (e.g. 2 for CJK/Emoji)
+ * into account, preventing 2x velocity overshoot on wide characters.
+ */
+export function visualColToCharOffset(
+	lineText: string,
+	targetCol: number,
+): number {
+	if (targetCol <= 0 || lineText.length === 0) return 0;
+	const segmenter = getSegmenter();
+	let currentVisualCol = 0;
+	for (const { segment, index } of segmenter.segment(lineText)) {
+		const segWidth = visibleWidth(segment);
+		if (targetCol < currentVisualCol + segWidth) {
+			return targetCol < currentVisualCol + segWidth / 2
+				? index
+				: index + segment.length;
+		}
+		currentVisualCol += segWidth;
+	}
+	return lineText.length;
+}
+
 
 export class NativeMouseEditor extends CustomEditor {
 	readonly #tui: TUI;
@@ -29,6 +55,7 @@ export class NativeMouseEditor extends CustomEditor {
 	#lastClickTime = 0;
 	#lastClickOffset = -1;
 	#clickCount = 0;
+	#upstreamTopBorderProvider?: ((availableWidth: number) => EditorTopBorder | undefined) | undefined = undefined;
 
 	constructor(
 		tui: TUI,
@@ -38,6 +65,27 @@ export class NativeMouseEditor extends CustomEditor {
 		super(theme);
 		this.#tui = tui;
 		this.#editBuffer = new EditBuffer("", { services: hostTextServices });
+		// Wrap setTopBorderProvider so [MOUSE 🖱️] dynamically prepends to the host StatusLine
+		super.setTopBorderProvider((availableWidth: number) => {
+			if (!this.#mouseActive) {
+				return this.#upstreamTopBorderProvider?.(availableWidth);
+			}
+
+			const badge = " \x1b[1;36m[MOUSE 🖱️]\x1b[0m ";
+			const badgeWidth = visibleWidth(badge);
+			const innerWidth = Math.max(0, availableWidth - badgeWidth);
+			const base = this.#upstreamTopBorderProvider?.(innerWidth);
+
+			if (!base) {
+				return { content: badge, width: badgeWidth };
+			}
+
+			return {
+				content: badge + base.content,
+				width: badgeWidth + base.width,
+			};
+		});
+
 
 		// Register selection decoration hook on CustomEditor
 		this.decorateText = (rowText: string, ctx: EditorTextDecorationContext): string => {
@@ -80,7 +128,6 @@ export class NativeMouseEditor extends CustomEditor {
 		this.#mouseActive = active;
 		this.#selection = null;
 		this.#isDragging = false;
-		this.#updateTopBadge();
 		this.#tui.requestRender();
 	}
 
@@ -88,16 +135,10 @@ export class NativeMouseEditor extends CustomEditor {
 		this.setMouseActive(!this.#mouseActive);
 	}
 
-	#updateTopBadge(): void {
-		if (this.#mouseActive) {
-			const badge = " \x1b[1;36m[MOUSE 🖱️]\x1b[0m ";
-			this.setTopBorder({
-				content: badge,
-				width: visibleWidth(badge),
-			});
-		} else {
-			this.setTopBorder(undefined);
-		}
+	override setTopBorderProvider(
+		provider: ((availableWidth: number) => EditorTopBorder | undefined) | undefined,
+	): void {
+		this.#upstreamTopBorderProvider = provider;
 	}
 
 	/**
@@ -126,8 +167,8 @@ export class NativeMouseEditor extends CustomEditor {
 		for (let i = 0; i < targetLine; i++) {
 			docOffset += (lines[i]?.length ?? 0) + 1;
 		}
-		const lineLength = lines[targetLine]?.length ?? 0;
-		docOffset += Math.max(0, Math.min(lineLength, textCol));
+		const lineText = lines[targetLine] ?? "";
+		docOffset += visualColToCharOffset(lineText, textCol);
 		const text = this.getText();
 		this.#editBuffer = new EditBuffer(text, { services: hostTextServices });
 		return this.#editBuffer.snapToBoundary(docOffset, "closest");
