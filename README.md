@@ -80,7 +80,6 @@ Install and resolve dependencies with a single command:
 ```bash
 omp plugin install github:gongquan45/omp-cursor
 ```
-*(If using upstream Pi, the command is `pi plugin install github:gongquan45/omp-cursor`)*
 
 ---
 

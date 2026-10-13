@@ -75,12 +75,11 @@
 
 ### 方式 A：一行命令官方插件安装（最推荐）
 
-任何 OMP / Pi 用户只需在终端执行一行命令，自动下载依赖并常驻就绪：
+在终端执行一行命令，即可自动下载依赖并常驻就绪：
 
 ```bash
 omp plugin install github:gongquan45/omp-cursor
 ```
-*(如果使用的是 Pi 原版，命令同样为 `pi plugin install github:gongquan45/omp-cursor`)*
 
 ---
 
