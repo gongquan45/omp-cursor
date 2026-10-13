@@ -83,18 +83,33 @@ omp plugin install github:gongquan45/omp-cursor
 
 ---
 
-### Method B: Manual clone to extensions directory
+### Method B: Add as an OMP Marketplace source
+
+This repository includes a built-in `.omp-plugin/marketplace.json` catalog. You can add it via CLI or interactive TUI commands:
 
 ```bash
-# 1. Clone into OMP extensions directory
-git clone https://github.com/gongquan45/omp-cursor.git ~/.omp/agent/extensions/omp-cursor
+# Via CLI:
+omp plugin marketplace add gongquan45/omp-cursor
+omp plugin install omp-cursor@omp-cursor
 
-# 2. Install dependencies
+# Or inside OMP interactive chat:
+/marketplace add gongquan45/omp-cursor
+/marketplace install omp-cursor@omp-cursor
+```
+
+---
+
+### Method C: Manual clone to extensions directory
+
+```bash
+git clone https://github.com/gongquan45/omp-cursor.git ~/.omp/agent/extensions/omp-cursor
 cd ~/.omp/agent/extensions/omp-cursor
 bun install
 ```
 
-### Method B: Configure local path
+---
+
+### Method D: Configure local path
 
 If cloned to a custom directory, add the absolute path to your user configuration `~/.omp/agent/config.yml` (on Windows: `%USERPROFILE%\.omp\agent\config.yml`):
 

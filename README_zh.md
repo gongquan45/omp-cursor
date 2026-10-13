@@ -83,18 +83,33 @@ omp plugin install github:gongquan45/omp-cursor
 
 ---
 
-### 方式 B：手动克隆至 OMP 扩展目录
+### 方式 B：作为 OMP 插件市场源添加
+
+本仓库自带标准的 `.omp-plugin/marketplace.json` 市场清单，支持通过命令行或 OMP 对话界面添加：
 
 ```bash
-# 1. 克隆到 OMP 插件目录
-git clone https://github.com/gongquan45/omp-cursor.git ~/.omp/agent/extensions/omp-cursor
+# 通过命令行添加并安装：
+omp plugin marketplace add gongquan45/omp-cursor
+omp plugin install omp-cursor@omp-cursor
 
-# 2. 安装依赖
+# 或在 OMP 聊天窗口内直接输入斜杠命令：
+/marketplace add gongquan45/omp-cursor
+/marketplace install omp-cursor@omp-cursor
+```
+
+---
+
+### 方式 C：手动克隆至 OMP 扩展目录
+
+```bash
+git clone https://github.com/gongquan45/omp-cursor.git ~/.omp/agent/extensions/omp-cursor
 cd ~/.omp/agent/extensions/omp-cursor
 bun install
 ```
 
-### 方式 B：在配置文件中指定本地路径
+---
+
+### 方式 D：在配置文件中指定本地路径
 
 如果你把代码克隆在其他自定义目录，可以在用户主配置文件 `~/.omp/agent/config.yml`（Windows 对应 `%USERPROFILE%\.omp\agent\config.yml`）中添加插件绝对路径：
 
