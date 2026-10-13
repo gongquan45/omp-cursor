@@ -28,7 +28,6 @@
   },
   "dependencies": {
     "@oh-my-pi/pi-natives": "18.10.0",
-    "@oh-my-pi/pi-natives-win32-x64": "18.10.0",
     "@oh-my-pi/pi-tui": "18.10.0"
   },
   "devDependencies": {
