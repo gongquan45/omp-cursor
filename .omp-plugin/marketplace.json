@@ -1,0 +1,30 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "omp-cursor",
+  "owner": {
+    "name": "gongquan45"
+  },
+  "metadata": {
+    "description": "In-place native mouse editing extension for Oh-My-Pi (OMP)",
+    "version": "0.2.1"
+  },
+  "plugins": [
+    {
+      "name": "omp-cursor",
+      "description": "In-place mouse cursor positioning, drag-to-highlight selection, and text editing directly inside the native OMP prompt box",
+      "version": "0.2.1",
+      "source": "./",
+      "category": "utilities",
+      "homepage": "https://github.com/gongquan45/omp-cursor",
+      "repository": "https://github.com/gongquan45/omp-cursor",
+      "license": "MIT",
+      "keywords": [
+        "omp",
+        "mouse",
+        "cursor",
+        "tui",
+        "editor"
+      ]
+    }
+  ]
+}
