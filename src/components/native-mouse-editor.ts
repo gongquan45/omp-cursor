@@ -27,6 +27,50 @@ export interface NativeMouseEditorOptions {
 	indicatorDisplay?: IndicatorDisplayMode;
 }
 
+export interface VisualLineSnapshot {
+	visualRow: number;
+	logicalLine: number;
+	startCol: number;
+	endCol: number;
+	text: string;
+}
+
+/**
+ * Slices a line into visual chunks based on visible column width and Unicode graphemes.
+ */
+export function wrapLineChunks(
+	line: string,
+	maxWidth: number,
+): Array<{ startCol: number; endCol: number; text: string }> {
+	if (!line || maxWidth <= 0) {
+		return [{ startCol: 0, endCol: 0, text: "" }];
+	}
+	if (visibleWidth(line) <= maxWidth) {
+		return [{ startCol: 0, endCol: line.length, text: line }];
+	}
+	const chunks: Array<{ startCol: number; endCol: number; text: string }> = [];
+	const segmenter = getSegmenter();
+	let chunkStart = 0;
+	let currentWidth = 0;
+	let currentText = "";
+
+	for (const { segment, index } of segmenter.segment(line)) {
+		const segWidth = visibleWidth(segment);
+		if (currentWidth + segWidth > maxWidth && currentText.length > 0) {
+			chunks.push({ startCol: chunkStart, endCol: index, text: currentText });
+			chunkStart = index;
+			currentWidth = 0;
+			currentText = "";
+		}
+		currentWidth += segWidth;
+		currentText += segment;
+	}
+	if (currentText.length > 0 || chunks.length === 0) {
+		chunks.push({ startCol: chunkStart, endCol: line.length, text: currentText });
+	}
+	return chunks;
+}
+
 /**
  * Maps visual cell column offset within a logical line to a UTF-16 character offset.
  * Accurately steps through Unicode grapheme clusters taking visibleWidth (e.g. 2 for CJK/Emoji)
@@ -97,7 +141,9 @@ export class NativeMouseEditor extends CustomEditor {
 	#upstreamTopBorderProvider?: ((availableWidth: number) => EditorTopBorder | undefined) | undefined = undefined;
 	#indicatorDisplay: IndicatorDisplayMode = "icon";
 	#draftSnapshotOnEnter: string | null = null;
-
+	#cachedVisualLinesRevision = -1;
+	#cachedVisualLinesWidth = -1;
+	#cachedVisualLines: VisualLineSnapshot[] = [];
 	constructor(
 		tui: TUI,
 		theme: EditorTheme,
@@ -153,8 +199,11 @@ export class NativeMouseEditor extends CustomEditor {
 
 
 		// Register selection decoration hook on CustomEditor
+		const upstreamDecorate = this.decorateText;
 		this.decorateText = (rowText: string, ctx: EditorTextDecorationContext): string => {
-			if (!this.isMouseEnabled || !this.#selection) return rowText;
+			const baseText = upstreamDecorate ? upstreamDecorate.call(this, rowText, ctx) : rowText;
+
+			if (!this.isMouseEnabled || !this.#selection) return baseText;
 			const lines = this.getLines();
 			let lineOffset = 0;
 			for (let i = 0; i < ctx.line; i++) {
@@ -169,14 +218,14 @@ export class NativeMouseEditor extends CustomEditor {
 				const idx1 = Math.max(0, oStart - rowStart);
 				const idx2 = Math.min(rowText.length, oEnd - rowStart);
 				return (
-					rowText.slice(0, idx1) +
+					baseText.slice(0, idx1) +
 					"\x1b[7m" +
-					rowText.slice(idx1, idx2) +
+					baseText.slice(idx1, idx2) +
 					"\x1b[27m" +
-					rowText.slice(idx2)
+					baseText.slice(idx2)
 				);
 			}
-			return rowText;
+			return baseText;
 		};
 	}
 
@@ -246,7 +295,76 @@ export class NativeMouseEditor extends CustomEditor {
 		return false;
 	}
 
-	#getLine0ScreenRow(): number {
+	#getVisualLines(): VisualLineSnapshot[] {
+		const width = this.#tui.terminal.columns ?? 80;
+		if (
+			this.#cachedVisualLinesRevision === this.textRevision &&
+			this.#cachedVisualLinesWidth === width
+		) {
+			return this.#cachedVisualLines;
+		}
+
+		const lines = this.getLines();
+		const styleId = this.getBorderStyle();
+		const leftMargin =
+			styleId === "claude" || styleId === "borderless" ? 2 : styleId === "pi" ? 1 : 3;
+		const contentWidth = Math.max(10, width - leftMargin - 1);
+
+		const vLines: VisualLineSnapshot[] = [];
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i] ?? "";
+			const chunks = wrapLineChunks(line, contentWidth);
+			for (const chunk of chunks) {
+				vLines.push({
+					visualRow: vLines.length,
+					logicalLine: i,
+					startCol: chunk.startCol,
+					endCol: chunk.endCol,
+					text: chunk.text,
+				});
+			}
+		}
+		this.#cachedVisualLines =
+			vLines.length > 0
+				? vLines
+				: [{ visualRow: 0, logicalLine: 0, startCol: 0, endCol: 0, text: "" }];
+		this.#cachedVisualLinesRevision = this.textRevision;
+		this.#cachedVisualLinesWidth = width;
+		return this.#cachedVisualLines;
+	}
+
+	#getCursorVisualRow(): number {
+		const cursor = this.getCursor();
+		const vLines = this.#getVisualLines();
+		for (let i = 0; i < vLines.length; i++) {
+			const vl = vLines[i]!;
+			if (vl.logicalLine === cursor.line) {
+				const isLastChunkForLine =
+					i === vLines.length - 1 || vLines[i + 1]!.logicalLine !== cursor.line;
+				if (cursor.col >= vl.startCol && (cursor.col < vl.endCol || isLastChunkForLine)) {
+					return i;
+				}
+			}
+		}
+		return 0;
+	}
+
+	#getContentRow0ScreenRow(): number {
+		const vLines = this.#getVisualLines();
+		const totalVisualRows = Math.max(1, vLines.length);
+		const styleId = this.getBorderStyle();
+		const bottomChromeRows =
+			styleId === "claude" || styleId === "pi" ? 2 : styleId === "borderless" ? 1 : 0;
+
+		const paint =
+			typeof this.#tui.getDebugPaint === "function"
+				? this.#tui.getDebugPaint()
+				: undefined;
+		if (paint?.cursor && typeof paint.cursor.y === "number") {
+			const vCursorRow = this.#getCursorVisualRow();
+			return paint.cursor.y - vCursorRow;
+		}
+
 		if (typeof this.#tui.getMutableViewport === "function") {
 			const vp = this.#tui.getMutableViewport();
 			if (
@@ -255,49 +373,47 @@ export class NativeMouseEditor extends CustomEditor {
 				typeof vp.length === "number" &&
 				vp.length > 0
 			) {
-				const rendered = this.render(this.#tui.terminal.columns);
-				const editorBoxHeight = rendered.length;
-				return vp.top + vp.length - editorBoxHeight + 1;
+				return vp.top + vp.length - bottomChromeRows - totalVisualRows;
 			}
 		}
-		const paint =
-			typeof this.#tui.getDebugPaint === "function"
-				? this.#tui.getDebugPaint()
-				: undefined;
-		if (paint?.cursor && typeof paint.cursor.y === "number") {
-			const cursor = this.getCursor();
-			return paint.cursor.y - cursor.line;
-		}
+
 		const totalRows = this.#tui.terminal.rows;
-		const rendered = this.render(this.#tui.terminal.columns);
-		const editorBoxHeight = rendered.length;
-		return Math.max(0, totalRows - editorBoxHeight + 1);
+		return Math.max(0, totalRows - bottomChromeRows - totalVisualRows);
 	}
 
 	#isRowInsideEditor(row: number): boolean {
-		const line0Row = this.#getLine0ScreenRow();
-		const lines = this.getLines();
-		return row >= line0Row && row < line0Row + lines.length;
+		const contentRow0 = this.#getContentRow0ScreenRow();
+		const vLines = this.#getVisualLines();
+		const totalVisualRows = Math.max(1, vLines.length);
+		return row >= contentRow0 && row < contentRow0 + totalVisualRows;
 	}
 
 	#getHitOffset(screenRow: number, screenCol: number): number {
-		const line0Row = this.#getLine0ScreenRow();
-		const contentRow = screenRow - line0Row;
-		const textCol = Math.max(0, screenCol - 3);
+		const contentRow0 = this.#getContentRow0ScreenRow();
+		const visualRow = screenRow - contentRow0;
+		const vLines = this.#getVisualLines();
+		const targetIndex = Math.max(0, Math.min(vLines.length - 1, visualRow));
+		const vLine = vLines[targetIndex];
+		if (!vLine) return 0;
+
+		const styleId = this.getBorderStyle();
+		const leftMargin =
+			styleId === "claude" || styleId === "borderless" ? 2 : styleId === "pi" ? 1 : 3;
+		const textCol = Math.max(0, screenCol - leftMargin);
+		const charOffsetInChunk = visualColToCharOffset(vLine.text, textCol);
+		const targetColInLine = vLine.startCol + charOffsetInChunk;
 
 		const lines = this.getLines();
-		const targetLine = Math.max(0, Math.min(lines.length - 1, contentRow));
 		let docOffset = 0;
-		for (let i = 0; i < targetLine; i++) {
+		for (let i = 0; i < vLine.logicalLine; i++) {
 			docOffset += (lines[i]?.length ?? 0) + 1;
 		}
-		const lineText = lines[targetLine] ?? "";
-		docOffset += visualColToCharOffset(lineText, textCol);
+		docOffset += targetColInLine;
+
 		const text = this.getText();
 		this.#editBuffer = new EditBuffer(text, { services: hostTextServices });
 		return this.#editBuffer.snapToBoundary(docOffset, "closest");
 	}
-
 	#handleSgrMouse(event: SgrMouseEvent): void {
 		if (event.leftClick) {
 			if (!this.#isRowInsideEditor(event.row)) {

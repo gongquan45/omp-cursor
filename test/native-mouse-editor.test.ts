@@ -328,4 +328,116 @@ describe("NativeMouseEditor (In-Place Native Mouse Editing)", () => {
 		// Crucial assertion: lines[0] must NOT contain \x1b[0m which wipes out background!
 		expect(lines[0]?.includes("\x1b[0m")).toBe(false);
 	});
+
+	it("accurately positions cursor when text exceeds 2 lines (3, 4, 5 lines)", () => {
+		const term = new MinimalTerminal();
+		term.columns = 80;
+		term.rows = 24;
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+		editor.setText("line 0\nline 1\nline 2\nline 3");
+		editor.setMouseActive(true);
+		editor.render(80);
+
+		// In 24 rows, 4 content rows occupy rows 20, 21, 22, 23 (0-based) -> 21, 22, 23, 24 (1-based SGR)
+		// 1. Click line 0 (1-based row 21)
+		editor.handleInput("\x1b[<0;5;21M");
+		expect(editor.getCursor()).toEqual({ line: 0, col: 1 });
+
+		// 2. Click line 1 (1-based row 22)
+		editor.handleInput("\x1b[<0;5;22M");
+		expect(editor.getCursor()).toEqual({ line: 1, col: 1 });
+
+		// 3. Click line 2 (1-based row 23) - previously broken!
+		editor.handleInput("\x1b[<0;5;23M");
+		expect(editor.getCursor()).toEqual({ line: 2, col: 1 });
+
+		// 4. Click line 3 (1-based row 24) - previously broken!
+		editor.handleInput("\x1b[<0;5;24M");
+		expect(editor.getCursor()).toEqual({ line: 3, col: 1 });
+	});
+
+	it("accurately positions cursor across soft-wrapped lines without dropping rows", () => {
+		const term = new MinimalTerminal();
+		term.columns = 30; // narrow terminal so long lines wrap
+		term.rows = 24;
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+
+		// 1 long line that wraps to 3 visual lines:
+		const longText = "This is a long sentence that definitely wraps across multiple visual lines in a narrow terminal";
+		editor.setText(longText);
+		editor.setMouseActive(true);
+		editor.render(30);
+
+		// Visual lines should be at least 3
+		// Verify all 3 visual rows capture input!
+		expect(editor.capturesInput("\x1b[<0;5;21M")).toBe(true);
+		expect(editor.capturesInput("\x1b[<0;5;22M")).toBe(true);
+		expect(editor.capturesInput("\x1b[<0;5;23M")).toBe(true);
+		expect(editor.capturesInput("\x1b[<0;5;24M")).toBe(true);
+
+		// Click on visual row 0, 1, 2 and check monotonic cursor progress
+		editor.handleInput("\x1b[<0;5;22M");
+		const pos0 = editor.getCursor().col;
+
+		editor.handleInput("\x1b[<0;5;23M");
+		const pos1 = editor.getCursor().col;
+
+		editor.handleInput("\x1b[<0;5;24M");
+		const pos2 = editor.getCursor().col;
+
+		expect(pos1).toBeGreaterThan(pos0);
+		expect(pos2).toBeGreaterThan(pos1);
+	});
+
+	it("handles drag selection across multiple lines when text exceeds 2 lines", () => {
+		const term = new MinimalTerminal();
+		term.columns = 80;
+		term.rows = 24;
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+		editor.setText("line 0\nline 1\nline 2\nline 3");
+		editor.setMouseActive(true);
+		editor.render(80);
+
+		// Click on line 0 (1-based row 21, col 5 -> col 1)
+		editor.handleInput("\x1b[<0;5;21M");
+		expect(editor.getCursor()).toEqual({ line: 0, col: 1 });
+
+		// Drag down to line 2 (1-based row 23, col 7 -> col 3)
+		editor.handleInput("\x1b[<32;7;23M");
+		expect(editor.selection).not.toBeNull();
+		// Start should be at line 0 col 1 (offset 1)
+		expect(editor.selection?.start).toBe(1);
+		// End should be at line 2 col 3 (offset: (6+1) + (6+1) + 3 = 17)
+		expect(editor.selection?.end).toBe(17);
+
+		// Release
+		editor.handleInput("\x1b[<0;7;23m");
+		expect(editor.selection).toEqual({ start: 1, end: 17 });
+	});
+
+	it("supports border styles claude, borderless, pi with correct left margins", () => {
+		const term = new MinimalTerminal();
+		term.columns = 80;
+		term.rows = 24;
+		const tui = new TUI(term);
+		const editor = new NativeMouseEditor(tui, getEditorTheme());
+		editor.setText("hello world");
+		editor.setMouseActive(true);
+
+		// claude style uses left margin 2 (1-based SGR col 4 -> text col 1)
+		editor.setBorderStyle("claude");
+		editor.render(80);
+		// 1-based col 4, row 22 (content row in claude)
+		editor.handleInput("\x1b[<0;4;22M");
+		expect(editor.getCursor().col).toBe(1);
+
+		// pi style uses left margin 1 (1-based SGR col 3 -> text col 1)
+		editor.setBorderStyle("pi");
+		editor.render(80);
+		editor.handleInput("\x1b[<0;3;22M");
+		expect(editor.getCursor().col).toBe(1);
+	});
 });

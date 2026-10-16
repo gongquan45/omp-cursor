@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "In-place native mouse editing extension for Oh-My-Pi (OMP)",
-    "version": "0.2.1"
+    "version": "0.2.2"
   },
   "plugins": [
     {
       "name": "omp-cursor",
       "description": "In-place mouse cursor positioning, drag-to-highlight selection, and text editing directly inside the native OMP prompt box",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "source": "./",
       "category": "utilities",
       "homepage": "https://github.com/gongquan45/omp-cursor",
