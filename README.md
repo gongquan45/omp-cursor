@@ -4,6 +4,10 @@
 
 In-place mouse cursor positioning, drag-to-highlight selection, and text editing directly inside the native [Oh-My-Pi (OMP)](https://omp.sh) prompt box.
 
+<p align="center">
+  <img src="./assets/demo.gif" alt="omp-cursor in action" width="720" />
+</p>
+
 ---
 
 ## Why this exists

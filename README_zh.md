@@ -4,6 +4,10 @@
 
 在 [Oh-My-Pi (OMP)](https://omp.sh) 原生输入框里，直接用鼠标点选光标、划词高亮和批量编辑。
 
+<p align="center">
+  <img src="./assets/demo.gif" alt="omp-cursor 实际运行效果" width="720" />
+</p>
+
 ---
 
 ## 为什么写这个
